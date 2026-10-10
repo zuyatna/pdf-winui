@@ -4,10 +4,11 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="PdfReader.App/PdfReader.App.csproj">
+  <Project Path="PdfReader.App/PdfReader.App.csproj" Id="8d7101da-41d2-40c4-9825-d46f8d6b2c10">
     <Platform Solution="*|ARM64" Project="ARM64" />
     <Platform Solution="*|x64" Project="x64" />
     <Platform Solution="*|x86" Project="x86" />
     <Deploy />
   </Project>
+  <Project Path="PdfReader.Core/PdfReader.Core.csproj" />
 </Solution>

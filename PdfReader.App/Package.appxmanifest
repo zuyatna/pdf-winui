@@ -9,11 +9,11 @@
   IgnorableNamespaces="uap rescap systemai">
 
   <Identity
-    Name="0f2b4191-0eca-49ed-bf63-accf3811f2a2"
+    Name="64a57f4a-0d28-465e-b1dc-80dd4bc1c6b9"
     Publisher="CN=90156638"
     Version="1.0.0.0" />
 
-  <mp:PhoneIdentity PhoneProductId="0f2b4191-0eca-49ed-bf63-accf3811f2a2" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+  <mp:PhoneIdentity PhoneProductId="64a57f4a-0d28-465e-b1dc-80dd4bc1c6b9" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
     <DisplayName>PdfReader.App</DisplayName>
