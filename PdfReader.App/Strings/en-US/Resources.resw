@@ -130,6 +130,9 @@
   <data name="ReadingThemeOriginalItem.Content" xml:space="preserve">
     <value>Original (Unchanged)</value>
   </data>
+  <data name="ReadingThemeOledItem.Content" xml:space="preserve">
+    <value>OLED (Pure Black)</value>
+  </data>
   <data name="ReadingThemeDarkItem.Content" xml:space="preserve">
     <value>Dark (Warm Palette)</value>
   </data>

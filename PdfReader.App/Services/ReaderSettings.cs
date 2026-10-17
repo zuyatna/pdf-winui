@@ -10,6 +10,9 @@ public sealed record ReaderSettings
     public const string DefaultDarkPageBackgroundHex = "#262624";
     public const string DefaultDarkTextHex = "#FAF9F5";
     public const string DefaultDarkCanvasHex = "#1F1E1D";
+    public const string DefaultOledPageBackgroundHex = "#000000";
+    public const string DefaultOledTextHex = "#FAF9F5";
+    public const string DefaultOledCanvasHex = "#000000";
     public const double DefaultImageDimPercentage = 10.0;
     public const int MaxRecentDocuments = 10;
 
@@ -22,6 +25,12 @@ public sealed record ReaderSettings
     public string DarkTextHex { get; init; } = DefaultDarkTextHex;
 
     public string DarkCanvasHex { get; init; } = DefaultDarkCanvasHex;
+
+    public string OledPageBackgroundHex { get; init; } = DefaultOledPageBackgroundHex;
+
+    public string OledTextHex { get; init; } = DefaultOledTextHex;
+
+    public string OledCanvasHex { get; init; } = DefaultOledCanvasHex;
 
     public double ImageDimPercentage { get; init; } = DefaultImageDimPercentage;
 
@@ -37,18 +46,20 @@ public sealed record ReaderSettings
             return ReadingThemePalette.Original;
         }
 
-        RgbColor pageBg = RgbColor.TryParseHex(DarkPageBackgroundHex, out RgbColor parsedBg)
+        bool isOled = ReadingTheme == ReadingThemeMode.Oled;
+        ReadingThemePalette defaults = isOled ? ReadingThemePalette.DefaultOled : ReadingThemePalette.DefaultDark;
+        RgbColor pageBg = RgbColor.TryParseHex(isOled ? OledPageBackgroundHex : DarkPageBackgroundHex, out RgbColor parsedBg)
             ? parsedBg
-            : RgbColor.DefaultDarkPageBackground;
-        RgbColor text = RgbColor.TryParseHex(DarkTextHex, out RgbColor parsedText)
+            : defaults.PageBackground;
+        RgbColor text = RgbColor.TryParseHex(isOled ? OledTextHex : DarkTextHex, out RgbColor parsedText)
             ? parsedText
-            : RgbColor.DefaultDarkText;
-        RgbColor canvas = RgbColor.TryParseHex(DarkCanvasHex, out RgbColor parsedCanvas)
+            : defaults.Text;
+        RgbColor canvas = RgbColor.TryParseHex(isOled ? OledCanvasHex : DarkCanvasHex, out RgbColor parsedCanvas)
             ? parsedCanvas
-            : RgbColor.DefaultDarkCanvas;
+            : defaults.Canvas;
 
         double dimAmount = Math.Clamp(ImageDimPercentage, 0.0, 50.0) / 100.0;
-        return new ReadingThemePalette(ReadingThemeMode.Dark, pageBg, text, canvas, dimAmount);
+        return new ReadingThemePalette(defaults.Mode, pageBg, text, canvas, dimAmount);
     }
 
     public DocumentViewState? FindDocumentState(string filePath)
