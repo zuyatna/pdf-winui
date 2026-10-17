@@ -109,7 +109,42 @@ dotnet build .\PdfReader.slnx -c Release -p:Platform=x64
 dotnet build .\PdfReader.slnx -c Release -p:Platform=ARM64
 ```
 
-### 2. Run and Debug in Visual Studio 2026
+### 2. Publish a Single-File EXE
+
+Run this command from the repository root to publish a single self-contained Windows x64 executable:
+
+```powershell
+dotnet publish .\PdfReader.App\PdfReader.App.csproj `
+  -c Release `
+  -r win-x64 `
+  --self-contained true `
+  -p:Platform=x64 `
+  -p:WindowsPackageType=None `
+  -p:WindowsAppSDKSelfContained=true `
+  -p:PublishSingleFile=true `
+  -p:IncludeAllContentForSelfExtract=true `
+  -p:DebugType=None `
+  -p:DebugSymbols=false `
+  -o .\artifacts\single-file\win-x64
+```
+
+The distributable file is `artifacts\single-file\win-x64\PdfReader.App.exe`. Launch it directly:
+
+```powershell
+.\artifacts\single-file\win-x64\PdfReader.App.exe
+```
+
+- `PublishSingleFile=true` overrides the existing publish profile's folder-based output.
+- `--self-contained true` and `WindowsAppSDKSelfContained=true` bundle both .NET and the Windows App SDK runtime.
+- `IncludeAllContentForSelfExtract=true` bundles native libraries and content, including PDFium and app resources. At launch, these dependencies are automatically extracted to a temporary directory; you only distribute the EXE.
+- `DebugType=None` and `DebugSymbols=false` omit separate debug-symbol files.
+- For ARM64, replace `-r win-x64` with `-r win-arm64`, `Platform=x64` with `Platform=ARM64`, and the output folder with `artifacts\single-file\win-arm64`.
+
+This publish mode is unpackaged. PDF file associations declared in `Package.appxmanifest` are applied through MSIX deployment; the standalone EXE can open PDFs through its picker, drag-and-drop, or command-line arguments.
+
+See Microsoft's [single-file WinUI deployment documentation](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/unpackage-winui-app#single-file-exe) for the required settings and extraction behavior.
+
+### 3. Run and Debug in Visual Studio 2026
 
 1. Open `PdfReader.slnx` in **Visual Studio 2026**.
 2. Set the solution configuration to **Debug** (or **Release**) and the solution platform to **x64** (or **ARM64**).
