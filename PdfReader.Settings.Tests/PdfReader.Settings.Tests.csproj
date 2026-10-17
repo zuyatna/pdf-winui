@@ -1,0 +1,17 @@
+<Project Sdk="MSTest.Sdk/4.5.1">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+    <UseVSTest>true</UseVSTest>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PdfReader.Core\PdfReader.Core.csproj" />
+    <!-- Compile the portable settings sources without loading the WinUI application. -->
+    <Compile Include="..\PdfReader.App\Services\AppUiTheme.cs" Link="Services\AppUiTheme.cs" />
+    <Compile Include="..\PdfReader.App\Services\ReaderSettings.cs" Link="Services\ReaderSettings.cs" />
+    <Compile Include="..\PdfReader.App\Services\ReaderSettingsService.cs" Link="Services\ReaderSettingsService.cs" />
+    <Compile Include="..\PdfReader.App\Services\ReaderSettingsJsonContext.cs" Link="Services\ReaderSettingsJsonContext.cs" />
+  </ItemGroup>
+</Project>

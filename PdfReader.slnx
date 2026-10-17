@@ -12,4 +12,5 @@
   </Project>
   <Project Path="PdfReader.Core.Tests/PdfReader.Core.Tests.csproj" Id="681cf0e8-7fc1-441b-9453-f48dcd3c0b81" />
   <Project Path="PdfReader.Core/PdfReader.Core.csproj" />
+  <Project Path="PdfReader.Settings.Tests/PdfReader.Settings.Tests.csproj" />
 </Solution>

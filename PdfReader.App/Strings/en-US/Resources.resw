@@ -238,4 +238,40 @@
   <data name="ErrorInfoBar.Title" xml:space="preserve">
     <value>Error</value>
   </data>
+  <data name="NavigationToggleButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Contents and bookmarks (Ctrl+B)</value></data>
+  <data name="NavigationToggleButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Toggle document navigation</value></data>
+  <data name="BookmarkToggleButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Toggle bookmark for current page (Ctrl+D)</value></data>
+  <data name="BookmarkToggleButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Bookmark current page</value></data>
+  <data name="ContentsTab.Content" xml:space="preserve"><value>Contents</value></data>
+  <data name="BookmarksTab.Content" xml:space="preserve"><value>Bookmarks</value></data>
+  <data name="ContentsList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Table of contents</value></data>
+  <data name="BookmarksList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Saved bookmarks</value></data>
+  <data name="EmptyContentsText.Text" xml:space="preserve"><value>This PDF has no embedded table of contents.</value></data>
+  <data name="EmptyBookmarksText.Text" xml:space="preserve"><value>No bookmarks yet. Press Ctrl+D to bookmark the current page.</value></data>
+  <data name="BookmarkTitleBox.Header" xml:space="preserve"><value>Current page bookmark</value></data>
+  <data name="BookmarkTitleBox.PlaceholderText" xml:space="preserve"><value>Optional bookmark title</value></data>
+  <data name="SaveBookmarkButton.Content" xml:space="preserve"><value>Save / update bookmark</value></data>
+  <data name="RemoveBookmarkButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Remove bookmark</value></data>
+  <data name="RemoveBookmarkButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Remove bookmark</value></data>
+  <data name="OutlineUntitled" xml:space="preserve"><value>Untitled section</value></data>
+  <data name="BookmarkPageFormat" xml:space="preserve"><value>Page {0}</value></data>
+  <data name="BookmarkSaveFailed" xml:space="preserve"><value>Could not save bookmarks. Check access to your local settings folder and try again.</value></data>
+  <data name="AdvancedMenuButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Advanced</value></data>
+  <data name="AdvancedMenuButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Advanced</value></data>
+  <data name="TextSelectionMenuItem.Text" xml:space="preserve"><value>Text selection</value></data>
+  <data name="CopyMenuItem.Text" xml:space="preserve"><value>Copy selected text</value></data>
+  <data name="CopyMenuItem.KeyboardAcceleratorTextOverride" xml:space="preserve"><value>Ctrl+C</value></data>
+  <data name="FindMenuItem.Text" xml:space="preserve"><value>Find in document</value></data>
+  <data name="FindMenuItem.KeyboardAcceleratorTextOverride" xml:space="preserve"><value>Ctrl+F</value></data>
+  <data name="DarkReadingMenuItem.Text" xml:space="preserve"><value>Dark reading</value></data>
+  <data name="AppearanceMenuItem.Text" xml:space="preserve"><value>Appearance</value></data>
+  <data name="ZoomOptionsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Zoom and page fit</value></data>
+  <data name="ZoomOptionsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Zoom and page fit</value></data>
+  <data name="ZoomFitWidthMenuItem.Text" xml:space="preserve"><value>Fit width</value></data>
+  <data name="ZoomFitPageMenuItem.Text" xml:space="preserve"><value>Fit page</value></data>
+  <data name="ZoomActualSizeMenuItem.Text" xml:space="preserve"><value>Actual size (100%)</value></data>
+  <data name="SidebarBookmarkToggle.Content" xml:space="preserve"><value>Bookmark this page (Ctrl+D)</value></data>
+  <data name="OpenPdfButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open PDF</value></data>
+  <data name="CloseAppearanceButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Close appearance</value></data>
+  <data name="CloseAppearanceButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Close appearance</value></data>
 </root>

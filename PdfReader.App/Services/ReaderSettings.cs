@@ -27,6 +27,9 @@ public sealed record ReaderSettings
 
     public IReadOnlyList<DocumentViewState> RecentDocuments { get; init; } = [];
 
+    // Kept independently so clearing or evicting recent files never deletes bookmarks.
+    public IReadOnlyList<DocumentViewState> BookmarkedDocuments { get; init; } = [];
+
     public ReadingThemePalette ToReadingThemePalette()
     {
         if (ReadingTheme == ReadingThemeMode.Original)
@@ -50,15 +53,22 @@ public sealed record ReaderSettings
 
     public DocumentViewState? FindDocumentState(string filePath)
     {
-        if (string.IsNullOrWhiteSpace(filePath) || RecentDocuments is null || RecentDocuments.Count == 0)
+        if (string.IsNullOrWhiteSpace(filePath))
         {
             return null;
         }
 
         string normalized = NormalizePath(filePath);
-        for (int i = 0; i < RecentDocuments.Count; i++)
+        foreach (DocumentViewState candidate in RecentDocuments ?? [])
         {
-            DocumentViewState candidate = RecentDocuments[i];
+            if (string.Equals(NormalizePath(candidate.FilePath), normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                return candidate;
+            }
+        }
+
+        foreach (DocumentViewState candidate in BookmarkedDocuments ?? [])
+        {
             if (string.Equals(NormalizePath(candidate.FilePath), normalized, StringComparison.OrdinalIgnoreCase))
             {
                 return candidate;
@@ -71,6 +81,7 @@ public sealed record ReaderSettings
     public ReaderSettings WithUpdatedDocumentState(DocumentViewState state, int maxEntries = MaxRecentDocuments)
     {
         ArgumentNullException.ThrowIfNull(state);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxEntries, 1);
 
         string normalized = NormalizePath(state.FilePath);
         var updated = new List<DocumentViewState>(maxEntries)
@@ -90,7 +101,21 @@ public sealed record ReaderSettings
             }
         }
 
-        return this with { RecentDocuments = updated.AsReadOnly() };
+        var bookmarked = new List<DocumentViewState>();
+        foreach (DocumentViewState existing in BookmarkedDocuments ?? [])
+        {
+            if (!string.Equals(NormalizePath(existing.FilePath), normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                bookmarked.Add(existing);
+            }
+        }
+
+        if (state.Bookmarks is { Count: > 0 })
+        {
+            bookmarked.Add(state with { FilePath = normalized });
+        }
+
+        return this with { RecentDocuments = updated.AsReadOnly(), BookmarkedDocuments = bookmarked.AsReadOnly() };
     }
 
     private static string NormalizePath(string filePath)

@@ -13,6 +13,8 @@ public interface IPdfDocumentService : IAsyncDisposable
 
     Task CloseDocumentAsync(CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<PdfOutlineItem>> GetOutlineAsync(CancellationToken cancellationToken = default);
+
     Task<RenderedPageBuffer> RenderPageAsync(
         int pageIndex,
         PixelSize targetSize,

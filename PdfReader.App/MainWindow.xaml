@@ -19,6 +19,12 @@
         x:Name="RootPage"
         Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
         RequestedTheme="{x:Bind ViewModel.RootRequestedTheme, Mode=OneWay}">
+        <Page.KeyboardAccelerators>
+            <KeyboardAccelerator Key="B" Modifiers="Control" Invoked="OnReaderAcceleratorInvoked" />
+            <KeyboardAccelerator Key="D" Modifiers="Control" Invoked="OnReaderAcceleratorInvoked" />
+            <KeyboardAccelerator Key="F" Modifiers="Control" Invoked="OnReaderAcceleratorInvoked" />
+            <KeyboardAccelerator Key="C" Modifiers="Control" Invoked="OnReaderAcceleratorInvoked" />
+        </Page.KeyboardAccelerators>
         <Grid
             x:Name="RootGrid"
             AllowDrop="True"
@@ -31,178 +37,99 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Border
-                Grid.Row="0"
-                Padding="16,10"
+            <Border Grid.Row="0" Padding="12,8"
                 Background="{ThemeResource LayerFillColorDefaultBrush}"
-                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                BorderThickness="0,0,0,1">
-                <Grid ColumnSpacing="8">
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-
-                    <Button
-                        x:Uid="OpenPdfButton"
-                        Grid.Column="0"
-                        Command="{x:Bind ViewModel.OpenDocumentCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <SymbolIcon Symbol="OpenFile" />
-                            <TextBlock x:Uid="OpenPdfButtonText" Text="Open PDF" />
-                        </StackPanel>
-                    </Button>
-
-                    <TextBlock
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        Opacity="0.75"
-                        Style="{ThemeResource CaptionTextBlockStyle}"
-                        Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                        TextTrimming="CharacterEllipsis" />
-
-                    <ProgressRing
-                        Grid.Column="2"
-                        Width="18"
-                        Height="18"
-                        IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
-
-                    <StackPanel
-                        Grid.Column="3"
-                        Orientation="Horizontal"
-                        Spacing="4"
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ToggleButton x:Name="NavigationButton" x:Uid="NavigationToggleButton"
+                            Padding="10" IsEnabled="{x:Bind ViewModel.HasDocument, Mode=OneWay}"
+                            Command="{x:Bind ViewModel.ToggleNavigationPaneCommand}"
+                            IsChecked="{x:Bind ViewModel.IsNavigationPaneOpen, Mode=OneWay}">
+                            <FontIcon Glyph="&#xE700;" FontSize="16" />
+                        </ToggleButton>
+                        <Button x:Name="OpenButton" x:Uid="OpenPdfButton"
+                            Command="{x:Bind ViewModel.OpenDocumentCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <SymbolIcon Symbol="OpenFile" />
+                                <TextBlock x:Uid="OpenPdfButtonText" Text="Open PDF" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <Grid Grid.Column="1" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ProgressRing Width="16" Height="16"
+                            IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+                        <TextBlock Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
+                    </Grid>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4"
                         Visibility="{x:Bind ViewModel.DocumentVisibility, Mode=OneWay}">
-                        <Button
-                            x:Uid="PrevPageButton"
-                            Command="{x:Bind ViewModel.PreviousPageCommand}"
-                            Padding="8,6">
+                        <Button x:Uid="PrevPageButton" Command="{x:Bind ViewModel.PreviousPageCommand}" Padding="8">
                             <FontIcon FontSize="12" Glyph="&#xE76B;" />
                         </Button>
-                        <TextBox
-                            x:Uid="GoToPageBox"
-                            x:Name="GoToPageTextBox"
-                            Width="56"
-                            VerticalAlignment="Center"
+                        <TextBox x:Uid="GoToPageBox" x:Name="GoToPageTextBox" Width="52" TextAlignment="Center"
                             KeyDown="OnGoToPageTextBoxKeyDown"
-                            Text="{x:Bind ViewModel.GoToPageInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                            TextAlignment="Center" />
-                        <TextBlock
-                            Margin="4,0"
-                            VerticalAlignment="Center"
-                            Opacity="0.8"
+                            Text="{x:Bind ViewModel.GoToPageInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock VerticalAlignment="Center" Margin="4,0"
                             Text="{x:Bind ViewModel.TotalPagesSuffixText, Mode=OneWay}" />
-                        <Button
-                            x:Uid="NextPageButton"
-                            Command="{x:Bind ViewModel.NextPageCommand}"
-                            Padding="8,6">
+                        <Button x:Uid="NextPageButton" Command="{x:Bind ViewModel.NextPageCommand}" Padding="8">
                             <FontIcon FontSize="12" Glyph="&#xE76C;" />
                         </Button>
                     </StackPanel>
-
-                    <StackPanel
-                        Grid.Column="4"
-                        Orientation="Horizontal"
-                        Spacing="4"
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4"
                         Visibility="{x:Bind ViewModel.DocumentVisibility, Mode=OneWay}">
-                        <Button
-                            x:Uid="ZoomOutButton"
-                            Command="{x:Bind ViewModel.ZoomOutCommand}"
-                            Padding="8,6">
+                        <Button x:Uid="ZoomOutButton" Command="{x:Bind ViewModel.ZoomOutCommand}" Padding="8">
                             <FontIcon FontSize="12" Glyph="&#xE71F;" />
                         </Button>
-                        <Button
-                            x:Uid="ZoomResetButton"
-                            MinWidth="62"
-                            Command="{x:Bind ViewModel.ResetZoomCommand}"
-                            Content="{x:Bind ViewModel.ZoomPercentageText, Mode=OneWay}" />
-                        <Button
-                            x:Uid="ZoomInButton"
-                            Command="{x:Bind ViewModel.ZoomInCommand}"
-                            Padding="8,6">
+                        <Button x:Name="ZoomOptionsButton" x:Uid="ZoomOptionsButton" MinWidth="64"
+                            Content="{x:Bind ViewModel.ZoomPercentageText, Mode=OneWay}">
+                            <Button.Flyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem x:Uid="ZoomFitWidthMenuItem" Command="{x:Bind ViewModel.SetFitWidthCommand}" />
+                                    <MenuFlyoutItem x:Uid="ZoomFitPageMenuItem" Command="{x:Bind ViewModel.SetFitPageCommand}" />
+                                    <MenuFlyoutItem x:Uid="ZoomActualSizeMenuItem" Command="{x:Bind ViewModel.ResetZoomCommand}" />
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
+                        <Button x:Uid="ZoomInButton" Command="{x:Bind ViewModel.ZoomInCommand}" Padding="8">
                             <FontIcon FontSize="12" Glyph="&#xE8A3;" />
                         </Button>
-                        <ToggleButton
-                            x:Uid="FitWidthButton"
-                            Command="{x:Bind ViewModel.SetFitWidthCommand}"
-                            Content="Fit Width"
-                            IsChecked="{x:Bind ViewModel.IsFitWidthActive, Mode=OneWay}" />
-                        <ToggleButton
-                            x:Uid="FitPageButton"
-                            Command="{x:Bind ViewModel.SetFitPageCommand}"
-                            Content="Fit Page"
-                            IsChecked="{x:Bind ViewModel.IsFitPageActive, Mode=OneWay}" />
                     </StackPanel>
-
-                    <StackPanel
-                        Grid.Column="5"
-                        Orientation="Horizontal"
-                        Spacing="4"
-                        Visibility="{x:Bind ViewModel.DocumentVisibility, Mode=OneWay}">
-                        <ToggleButton
-                            x:Uid="ReadingModeButton"
-                            Command="{x:Bind ViewModel.SetReadingInteractionModeCommand}"
-                            IsChecked="{x:Bind ViewModel.IsReadingInteractionMode, Mode=OneWay}">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <FontIcon FontSize="13" Glyph="&#xE759;" />
-                                <TextBlock x:Uid="ReadingModeButtonText" Text="Read" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton
-                            x:Uid="SelectionModeButton"
-                            Command="{x:Bind ViewModel.SetTextSelectionModeCommand}"
-                            IsChecked="{x:Bind ViewModel.IsTextSelectionMode, Mode=OneWay}">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <FontIcon FontSize="13" Glyph="&#xE8D2;" />
-                                <TextBlock x:Uid="SelectionModeButtonText" Text="Select" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <Button
-                            x:Uid="CopyTextButton"
-                            Command="{x:Bind ViewModel.CopySelectedTextCommand}"
-                            Content="Copy"
-                            IsEnabled="{x:Bind ViewModel.HasTextSelection, Mode=OneWay}">
-                            <Button.KeyboardAccelerators>
-                                <KeyboardAccelerator Key="C" Modifiers="Control" />
-                            </Button.KeyboardAccelerators>
-                        </Button>
-                        <ToggleButton
-                            x:Uid="FindToggleButton"
-                            Command="{x:Bind ViewModel.ToggleSearchBarCommand}"
-                            IsChecked="{x:Bind ViewModel.IsSearchBarOpen, Mode=OneWay}">
-                            <ToggleButton.KeyboardAccelerators>
-                                <KeyboardAccelerator Key="F" Modifiers="Control" />
-                            </ToggleButton.KeyboardAccelerators>
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <FontIcon FontSize="13" Glyph="&#xE721;" />
-                                <TextBlock x:Uid="FindToggleButtonText" Text="Find" />
-                            </StackPanel>
-                        </ToggleButton>
-                    </StackPanel>
-
-                    <ToggleButton
-                        x:Uid="DarkReadingToggleButton"
-                        Grid.Column="6"
-                        IsChecked="{x:Bind ViewModel.IsDarkReadingMode, Mode=TwoWay}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon FontSize="14" Glyph="&#xE708;" />
-                            <TextBlock x:Uid="DarkReadingToggleButtonText" Text="Dark Reading" />
-                        </StackPanel>
-                    </ToggleButton>
-
-                    <Button
-                        x:Uid="SettingsButton"
-                        Grid.Column="7"
-                        Command="{x:Bind ViewModel.ToggleSettingsPaneCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <SymbolIcon Symbol="Setting" />
-                            <TextBlock x:Uid="SettingsButtonText" Text="Appearance" />
-                        </StackPanel>
+                    <Button x:Name="AdvancedMenuButton" x:Uid="AdvancedMenuButton" Grid.Column="4" Padding="10">
+                        <FontIcon Glyph="&#xE712;" FontSize="16" />
+                        <Button.Flyout>
+                            <MenuFlyout>
+                                <ToggleMenuFlyoutItem x:Uid="TextSelectionMenuItem"
+                                    IsEnabled="{x:Bind ViewModel.HasDocument, Mode=OneWay}"
+                                    IsChecked="{x:Bind ViewModel.IsTextSelectionMode, Mode=TwoWay}" />
+                                <MenuFlyoutItem x:Uid="CopyMenuItem" Command="{x:Bind ViewModel.CopySelectedTextCommand}"
+                                    IsEnabled="{x:Bind ViewModel.HasTextSelection, Mode=OneWay}">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C8;" /></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem x:Uid="FindMenuItem" Command="{x:Bind ViewModel.OpenSearchBarCommand}"
+                                    IsEnabled="{x:Bind ViewModel.HasDocument, Mode=OneWay}">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE721;" /></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutSeparator />
+                                <ToggleMenuFlyoutItem x:Uid="DarkReadingMenuItem"
+                                    IsChecked="{x:Bind ViewModel.IsDarkReadingMode, Mode=TwoWay}" />
+                                <MenuFlyoutItem x:Uid="AppearanceMenuItem" Command="{x:Bind ViewModel.ToggleSettingsPaneCommand}">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE713;" /></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                            </MenuFlyout>
+                        </Button.Flyout>
                     </Button>
                 </Grid>
             </Border>
@@ -294,10 +221,19 @@
                 <SplitView.Pane>
                     <ScrollViewer Padding="20,16">
                         <StackPanel Spacing="16">
-                            <TextBlock
-                                x:Uid="SettingsPaneHeader"
-                                Style="{ThemeResource SubtitleTextBlockStyle}"
-                                Text="Appearance &amp; Reading Theme" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Uid="SettingsPaneHeader" TextWrapping="Wrap"
+                                    Style="{ThemeResource SubtitleTextBlockStyle}"
+                                    Text="Appearance &amp; Reading Theme" />
+                                <Button x:Uid="CloseAppearanceButton" Grid.Column="1" Padding="8"
+                                    VerticalAlignment="Top" Command="{x:Bind ViewModel.ToggleSettingsPaneCommand}">
+                                    <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                </Button>
+                            </Grid>
 
                             <ComboBox
                                 x:Uid="UiThemeComboBox"
@@ -412,7 +348,119 @@
                 </SplitView.Pane>
 
                 <SplitView.Content>
-                    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="288" Padding="12" BorderThickness="0,0,1,0"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                Visibility="{x:Bind ViewModel.NavigationPaneVisibility, Mode=OneWay}">
+                            <Grid RowSpacing="12">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <RadioButton x:Uid="ContentsTab" GroupName="DocumentNavigation" HorizontalAlignment="Stretch"
+                                        Checked="OnContentsTabChecked"
+                                        IsChecked="{x:Bind ViewModel.IsContentsTabSelected, Mode=OneWay}" />
+                                    <RadioButton x:Uid="BookmarksTab" GroupName="DocumentNavigation" Grid.Column="1" HorizontalAlignment="Stretch"
+                                        Checked="OnBookmarksTabChecked"
+                                        IsChecked="{x:Bind ViewModel.IsBookmarksTabSelected, Mode=OneWay}" />
+                                </Grid>
+                                <Grid Grid.Row="1" Visibility="{x:Bind ViewModel.ContentsTabVisibility, Mode=OneWay}">
+                                    <TextBlock x:Uid="EmptyContentsText" Margin="12" TextWrapping="Wrap"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Visibility="{x:Bind ViewModel.EmptyOutlineVisibility, Mode=OneWay}" />
+                                    <ListView x:Uid="ContentsList" ItemsSource="{x:Bind ViewModel.OutlineItems}"
+                                        SelectionMode="None" IsItemClickEnabled="True" ItemClick="OnOutlineItemClick"
+                                        ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="Padding" Value="0" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:OutlineNodeViewModel">
+                                                <Grid Padding="{x:Bind ItemPadding}" ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="3" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border CornerRadius="2" Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                                        Visibility="{x:Bind ActiveIndicatorVisibility, Mode=OneWay}" />
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind Title}" TextWrapping="Wrap"
+                                                        Opacity="{x:Bind TitleOpacity}" />
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind PageBadgeText}"
+                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </Grid>
+                                <Grid Grid.Row="1" RowSpacing="10" Visibility="{x:Bind ViewModel.BookmarksTabVisibility, Mode=OneWay}">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <TextBox x:Uid="BookmarkTitleBox" MaxLength="200"
+                                        Text="{x:Bind ViewModel.BookmarkTitleInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <StackPanel Grid.Row="1" Spacing="6">
+                                        <Button x:Uid="SaveBookmarkButton" HorizontalAlignment="Stretch"
+                                            Command="{x:Bind ViewModel.SaveBookmarkCommand}" />
+                                        <ToggleButton x:Uid="SidebarBookmarkToggle" HorizontalAlignment="Stretch"
+                                            Command="{x:Bind ViewModel.ToggleCurrentPageBookmarkCommand}"
+                                            IsChecked="{x:Bind ViewModel.IsCurrentPageBookmarked, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <Grid Grid.Row="2">
+                                        <TextBlock x:Uid="EmptyBookmarksText" Margin="12" TextWrapping="Wrap"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Visibility="{x:Bind ViewModel.EmptyBookmarksVisibility, Mode=OneWay}" />
+                                        <ListView x:Uid="BookmarksList" ItemsSource="{x:Bind ViewModel.Bookmarks}"
+                                            SelectionMode="None" IsItemClickEnabled="True" ItemClick="OnBookmarkItemClick">
+                                            <ListView.ItemContainerStyle>
+                                                <Style TargetType="ListViewItem">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                    <Setter Property="Padding" Value="4,8" />
+                                                </Style>
+                                            </ListView.ItemContainerStyle>
+                                            <ListView.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:BookmarkItemViewModel">
+                                                    <Grid ColumnSpacing="8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="3" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border CornerRadius="2" Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                                            Visibility="{x:Bind ActiveIndicatorVisibility, Mode=OneWay}" />
+                                                        <StackPanel Grid.Column="1" Spacing="4">
+                                                            <TextBlock Text="{x:Bind Title}" TextWrapping="Wrap" />
+                                                            <TextBlock Text="{x:Bind PageBadgeText}" Style="{ThemeResource CaptionTextBlockStyle}"
+                                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                        </StackPanel>
+                                                        <Button x:Uid="RemoveBookmarkButton" Grid.Column="2" Click="OnRemoveBookmarkClick"
+                                                            Padding="6" VerticalAlignment="Center">
+                                                            <FontIcon Glyph="&#xE74D;" FontSize="12" />
+                                                        </Button>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListView.ItemTemplate>
+                                        </ListView>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                        <Grid Grid.Column="1" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
                         <ScrollViewer
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Center"
@@ -533,6 +581,7 @@
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
+                        </Grid>
                     </Grid>
                 </SplitView.Content>
             </SplitView>

@@ -94,6 +94,27 @@ public sealed class ViewportRenderCoordinator : IDisposable
             viewportHeight,
             itemSpacing);
 
+        return UpdateVisiblePages(pages, firstVisible, lastVisible, primaryVisible, triggerRenders);
+    }
+
+    public int UpdateVisiblePages(
+        IReadOnlyList<PdfPageItem> pages,
+        int firstVisible,
+        int lastVisible,
+        int primaryVisible,
+        bool triggerRenders = true)
+    {
+        ArgumentNullException.ThrowIfNull(pages);
+        if (_disposed || pages.Count == 0)
+        {
+            CancelAll();
+            return 0;
+        }
+
+        firstVisible = Math.Clamp(firstVisible, 0, pages.Count - 1);
+        lastVisible = Math.Clamp(lastVisible, firstVisible, pages.Count - 1);
+        primaryVisible = Math.Clamp(primaryVisible, firstVisible, lastVisible);
+
         if (!triggerRenders)
         {
             return primaryVisible;

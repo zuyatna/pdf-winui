@@ -8,7 +8,7 @@ using PDFiumCore;
 
 namespace PdfReader.Core;
 
-public sealed class PdfDocumentService : IPdfDocumentService
+public sealed partial class PdfDocumentService : IPdfDocumentService
 {
     private const int FpdfPageObjImage = 3;
     private const int FpdfPageObjForm = 5;

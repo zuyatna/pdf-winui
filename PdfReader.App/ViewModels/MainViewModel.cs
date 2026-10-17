@@ -70,7 +70,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     public event EventHandler? ZoomChanged;
 
-    public event EventHandler<int>? ScrollToPageRequested;
+    public event EventHandler<PdfPageDestination>? ScrollToPageRequested;
 
     public event EventHandler? FocusSearchBoxRequested;
 
@@ -641,6 +641,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         ErrorMessage = null;
         ClearTextSelection();
         ClearSearchHighlights();
+        ResetDocumentNavigation();
+        HasDocument = false;
         StatusMessage = string.Format(
             CultureInfo.CurrentCulture,
             GetString("StatusOpeningFormat", "Opening {0}..."),
@@ -651,6 +653,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             _renderPipeline.ClearCache();
 
             PdfDocumentMetadata metadata = await _documentService.OpenDocumentAsync(fullPath, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            IReadOnlyList<PdfOutlineItem> outline = await _documentService.GetOutlineAsync(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
             ReaderSettings currentSettings = BuildCurrentSettings();
@@ -695,6 +699,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             CurrentPageNumber = restoredPage;
             GoToPageInput = restoredPage.ToString(CultureInfo.InvariantCulture);
 
+            LoadDocumentNavigation(outline, savedState?.Bookmarks);
+
             HasDocument = true;
             WindowTitle = $"{fileName} — {GetString("AppDisplayName", "PDF Reader")}";
             StatusMessage = string.Format(
@@ -708,7 +714,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
             if (restoredPage > 1)
             {
-                ScrollToPageRequested?.Invoke(this, restoredPage - 1);
+                ScrollToPageRequested?.Invoke(this, new PdfPageDestination(restoredPage - 1));
             }
         }
         catch (OperationCanceledException)
@@ -717,7 +723,13 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
         catch (Exception ex)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
             _currentFilePath = null;
+            ResetDocumentNavigation();
             Pages.Clear();
             TotalPages = 0;
             CurrentPageNumber = 1;
@@ -733,7 +745,10 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
         finally
         {
-            IsBusy = false;
+            if (ReferenceEquals(_openCts, newCts))
+            {
+                IsBusy = false;
+            }
         }
     }
 
@@ -752,6 +767,14 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         _renderPipeline.Dispose();
         await _documentService.DisposeAsync();
+        try
+        {
+            await _settingsService.FlushAsync();
+        }
+        catch (IOException ex)
+        {
+            System.Diagnostics.Debug.WriteLine(ex.Message);
+        }
     }
 
     partial void OnHasDocumentChanged(bool value)
@@ -761,6 +784,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(SearchBarVisibility));
         OnPropertyChanged(nameof(RecentFilesVisibility));
         OnPropertyChanged(nameof(TotalPagesSuffixText));
+        OnPropertyChanged(nameof(NavigationPaneVisibility));
+        UpdateNavigationIndicators();
     }
 
     partial void OnIsTextSelectionModeChanged(bool value)
@@ -971,7 +996,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    private void NavigateToPageNumber(int targetPageNumber)
+    private void NavigateToPageNumber(int targetPageNumber, PdfPageDestination? destination = null)
     {
         if (!HasDocument || Pages.Count == 0 || _isUpdatingPageFromScroll)
         {
@@ -982,7 +1007,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         CurrentPageNumber = clamped;
         GoToPageInput = clamped.ToString(CultureInfo.InvariantCulture);
         PersistCurrentDocumentState();
-        ScrollToPageRequested?.Invoke(this, clamped - 1);
+        ScrollToPageRequested?.Invoke(this, destination ?? new PdfPageDestination(clamped - 1));
     }
 
     private void RecalculateFitZoom()
@@ -1018,6 +1043,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             DarkCanvasHex = settings.DarkCanvasHex;
             ImageDimPercentage = Math.Clamp(settings.ImageDimPercentage, 0.0, 50.0);
             _recentDocumentStates = settings.RecentDocuments ?? [];
+            _bookmarkedDocumentStates = settings.BookmarkedDocuments ?? [];
             RefreshRecentFilesCollection();
         }
         finally
@@ -1064,10 +1090,12 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             Math.Max(1, CurrentPageNumber),
             ZoomCalculator.Clamp(Zoom),
             ActiveZoomMode,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            GetBookmarksSnapshot());
 
         ReaderSettings updated = BuildCurrentSettings().WithUpdatedDocumentState(state);
         _recentDocumentStates = updated.RecentDocuments;
+        _bookmarkedDocumentStates = updated.BookmarkedDocuments;
         RefreshRecentFilesCollection();
         _settingsService.Save(updated);
     }
@@ -1097,6 +1125,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             DarkCanvasHex = DarkCanvasHex,
             ImageDimPercentage = Math.Clamp(ImageDimPercentage, 0.0, 50.0),
             RecentDocuments = _recentDocumentStates,
+            BookmarkedDocuments = _bookmarkedDocumentStates,
         };
     }
 

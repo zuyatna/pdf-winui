@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Window
 
     private readonly ViewportRenderCoordinator _viewportCoordinator;
     private readonly DispatcherQueueTimer _zoomDebounceTimer;
+    private readonly DispatcherQueueTimer _navigationAlignmentTimer;
     private readonly PointerEventHandler _panPointerPressedHandler;
     private readonly PointerEventHandler _panPointerMovedHandler;
     private readonly PointerEventHandler _panPointerReleasedHandler;
@@ -38,6 +39,12 @@ public sealed partial class MainWindow : Window
     private bool _isPanning;
     private bool _xamlRootSubscribed;
     private bool _isZoomSettling;
+    private PdfPageDestination? _pendingDestination;
+    private PdfPageItem? _pendingDestinationPage;
+    private int _navigationAlignmentAttempts;
+    private int _navigationStableFrames;
+    private double _lastNavigationExtent = -1;
+    private double _lastNavigationViewport = -1;
 
     public MainWindow()
     {
@@ -50,6 +57,11 @@ public sealed partial class MainWindow : Window
         _zoomDebounceTimer.Interval = s_zoomSettleDelay;
         _zoomDebounceTimer.IsRepeating = false;
         _zoomDebounceTimer.Tick += OnZoomDebounceTimerTick;
+
+        _navigationAlignmentTimer = DispatcherQueue.CreateTimer();
+        _navigationAlignmentTimer.Interval = TimeSpan.FromMilliseconds(16);
+        _navigationAlignmentTimer.IsRepeating = true;
+        _navigationAlignmentTimer.Tick += OnNavigationAlignmentTick;
 
         _panPointerPressedHandler = new PointerEventHandler(OnPagesListViewPointerPressed);
         _panPointerMovedHandler = new PointerEventHandler(OnPagesListViewPointerMoved);
@@ -172,6 +184,7 @@ public sealed partial class MainWindow : Window
 
     private void OnDocumentLoaded(object? sender, EventArgs e)
     {
+        CancelDestinationAlignment();
         EnsureScrollViewerHooked();
         _scrollViewer?.ChangeView(null, 0, null, disableAnimation: true);
         DispatcherQueue.TryEnqueue(() => RefreshViewport(triggerRenders: true));
@@ -190,6 +203,7 @@ public sealed partial class MainWindow : Window
 
     private void OnViewModelZoomChanged(object? sender, EventArgs e)
     {
+        CancelDestinationAlignment();
         // Keep scaled placeholder bitmaps visible while zoom settles, then re-render at new scale.
         _isZoomSettling = true;
         _viewportCoordinator.CancelAll();
@@ -203,19 +217,87 @@ public sealed partial class MainWindow : Window
         RefreshViewport(triggerRenders: true);
     }
 
-    private void OnScrollToPageRequested(object? sender, int targetPageIndex)
+    private void OnScrollToPageRequested(object? sender, PdfPageDestination destination)
     {
-        EnsureScrollViewerHooked();
-        double targetOffset = ViewportRenderCoordinator.CalculatePageVerticalOffset(
-            ViewModel.Pages,
-            targetPageIndex,
-            PageItemBottomMargin);
-
-        DispatcherQueue.TryEnqueue(() =>
+        if (destination.PageIndex < 0 || destination.PageIndex >= ViewModel.Pages.Count)
         {
-            _scrollViewer?.ChangeView(null, targetOffset, null, disableAnimation: true);
+            return;
+        }
+
+        EnsureScrollViewerHooked();
+        _pendingDestination = destination;
+        _pendingDestinationPage = ViewModel.Pages[destination.PageIndex];
+        _navigationAlignmentAttempts = 0;
+        _navigationStableFrames = 0;
+        _lastNavigationExtent = -1;
+        _lastNavigationViewport = -1;
+        PagesListView.ScrollIntoView(_pendingDestinationPage, ScrollIntoViewAlignment.Leading);
+        PagesListView.UpdateLayout();
+        _navigationAlignmentTimer.Start();
+    }
+
+    private void OnNavigationAlignmentTick(DispatcherQueueTimer sender, object args)
+    {
+        if (++_navigationAlignmentAttempts > 60)
+        {
+            CancelDestinationAlignment();
             RefreshViewport(triggerRenders: true);
-        });
+            return;
+        }
+
+        PagesListView.UpdateLayout();
+        AlignPendingDestination();
+    }
+
+    private void CancelDestinationAlignment()
+    {
+        _navigationAlignmentTimer.Stop();
+        _pendingDestination = null;
+        _pendingDestinationPage = null;
+    }
+
+    private void AlignPendingDestination()
+    {
+        if (_pendingDestination is not PdfPageDestination destination || _scrollViewer is null)
+        {
+            return;
+        }
+
+        if (!ViewModel.HasDocument || destination.PageIndex >= ViewModel.Pages.Count ||
+            !ReferenceEquals(ViewModel.Pages[destination.PageIndex], _pendingDestinationPage))
+        {
+            CancelDestinationAlignment();
+            return;
+        }
+
+        if (PagesListView.ContainerFromItem(_pendingDestinationPage) is not DependencyObject container ||
+            FindDescendant<Views.PdfPageView>(container)?.Content is not Border { Child: FrameworkElement bitmapArea } ||
+            bitmapArea.ActualHeight <= 0 || bitmapArea.ActualWidth <= 0)
+        {
+            return; // Wait for the virtualized target to be realized and measured.
+        }
+
+        Point pageOrigin = bitmapArea.TransformToVisual(_scrollViewer).TransformPoint(new Point(0, 0));
+        double vertical = destination.GetVerticalOffset(_scrollViewer.VerticalOffset, pageOrigin.Y,
+            bitmapArea.ActualHeight, _scrollViewer.ScrollableHeight);
+        double? horizontal = destination.GetHorizontalOffset(_scrollViewer.HorizontalOffset, pageOrigin.X,
+            bitmapArea.ActualWidth, _scrollViewer.ScrollableWidth);
+        bool aligned = Math.Abs(_scrollViewer.VerticalOffset - vertical) < 0.5 &&
+            (!horizontal.HasValue || Math.Abs(_scrollViewer.HorizontalOffset - horizontal.Value) < 0.5);
+        bool stableExtent = Math.Abs(_lastNavigationExtent - _scrollViewer.ExtentHeight) < 0.5 &&
+            Math.Abs(_lastNavigationViewport - _scrollViewer.ViewportHeight) < 0.5;
+        _lastNavigationExtent = _scrollViewer.ExtentHeight;
+        _lastNavigationViewport = _scrollViewer.ViewportHeight;
+        _navigationStableFrames = aligned && stableExtent ? _navigationStableFrames + 1 : 0;
+        if (_navigationStableFrames >= 3)
+        {
+            CancelDestinationAlignment();
+            RefreshViewport(triggerRenders: true);
+        }
+        else if (!aligned)
+        {
+            _scrollViewer.ChangeView(horizontal, vertical, null, disableAnimation: true);
+        }
     }
 
     private void OnFocusSearchBoxRequested(object? sender, EventArgs e)
@@ -234,6 +316,7 @@ public sealed partial class MainWindow : Window
 
     private void OnPagesListViewPointerPressed(object sender, PointerRoutedEventArgs e)
     {
+        CancelDestinationAlignment();
         if (!ViewModel.HasDocument || ViewModel.IsTextSelectionMode)
         {
             return;
@@ -324,6 +407,7 @@ public sealed partial class MainWindow : Window
 
     private void OnPagesListViewPointerWheelChanged(object sender, PointerRoutedEventArgs e)
     {
+        CancelDestinationAlignment();
         if (!e.KeyModifiers.HasFlag(VirtualKeyModifiers.Control))
         {
             return;
@@ -344,6 +428,70 @@ public sealed partial class MainWindow : Window
         {
             e.Handled = true;
             ViewModel.GoToPageCommand.Execute(null);
+        }
+    }
+
+    private async void OnReaderAcceleratorInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        if (sender.Key == VirtualKey.C &&
+            FocusManager.GetFocusedElement(RootGrid.XamlRoot) is TextBox or RichEditBox or PasswordBox)
+        {
+            return;
+        }
+
+        if (!ViewModel.HasDocument)
+        {
+            return;
+        }
+
+        args.Handled = true;
+        switch (sender.Key)
+        {
+            case VirtualKey.B:
+                ViewModel.ToggleNavigationPaneCommand.Execute(null);
+                break;
+            case VirtualKey.D:
+                await ViewModel.ToggleCurrentPageBookmarkCommand.ExecuteAsync(null);
+                break;
+            case VirtualKey.F:
+                ViewModel.OpenSearchBarCommand.Execute(null);
+                break;
+            case VirtualKey.C:
+                args.Handled = ViewModel.HasTextSelection;
+                if (args.Handled)
+                {
+                    ViewModel.CopySelectedTextCommand.Execute(null);
+                }
+
+                break;
+        }
+    }
+
+    private void OnOutlineItemClick(object sender, ItemClickEventArgs e)
+    {
+        ViewModel.NavigateToOutlineCommand.Execute(e.ClickedItem as OutlineNodeViewModel);
+    }
+
+    private void OnContentsTabChecked(object sender, RoutedEventArgs e)
+    {
+        ViewModel.ShowContentsCommand.Execute(null);
+    }
+
+    private void OnBookmarksTabChecked(object sender, RoutedEventArgs e)
+    {
+        ViewModel.ShowBookmarksCommand.Execute(null);
+    }
+
+    private void OnBookmarkItemClick(object sender, ItemClickEventArgs e)
+    {
+        ViewModel.NavigateToBookmarkCommand.Execute(e.ClickedItem as BookmarkItemViewModel);
+    }
+
+    private async void OnRemoveBookmarkClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: BookmarkItemViewModel item })
+        {
+            await ViewModel.RemoveBookmarkCommand.ExecuteAsync(item);
         }
     }
 
@@ -395,17 +543,43 @@ public sealed partial class MainWindow : Window
             ? _scrollViewer.ViewportHeight
             : PagesListView.ActualHeight;
 
-        int activePageIndex = _viewportCoordinator.UpdateViewport(
-            ViewModel.Pages,
-            verticalOffset,
-            viewportHeight,
-            PageItemBottomMargin,
-            triggerRenders);
+        int activePageIndex;
+        if (PagesListView.ItemsPanelRoot is ItemsStackPanel { FirstVisibleIndex: >= 0 } panel &&
+            panel.LastVisibleIndex >= panel.FirstVisibleIndex && ViewModel.Pages.Count > 0)
+        {
+            activePageIndex = _viewportCoordinator.UpdateVisiblePages(ViewModel.Pages,
+                panel.FirstVisibleIndex, panel.LastVisibleIndex, FindPrimaryVisiblePage(panel, viewportHeight), triggerRenders);
+        }
+        else
+        {
+            activePageIndex = _viewportCoordinator.UpdateViewport(
+                ViewModel.Pages, verticalOffset, viewportHeight, PageItemBottomMargin, triggerRenders);
+        }
 
-        if (ViewModel.HasDocument)
+        if (ViewModel.HasDocument && _pendingDestination is null)
         {
             ViewModel.UpdateVisiblePageFromScroll(activePageIndex);
         }
+    }
+
+    private int FindPrimaryVisiblePage(ItemsStackPanel panel, double viewportHeight)
+    {
+        int primaryVisible = panel.FirstVisibleIndex;
+        for (int i = panel.FirstVisibleIndex; i <= panel.LastVisibleIndex; i++)
+        {
+            if (_scrollViewer is not null && PagesListView.ContainerFromIndex(i) is FrameworkElement container)
+            {
+                double bottom = container.TransformToVisual(_scrollViewer)
+                    .TransformPoint(new Point(0, container.ActualHeight)).Y;
+                primaryVisible = i;
+                if (bottom >= viewportHeight * 0.35)
+                {
+                    break;
+                }
+            }
+        }
+
+        return primaryVisible;
     }
 
     private async Task<string?> PickPdfFileAsync()
@@ -440,6 +614,8 @@ public sealed partial class MainWindow : Window
         ViewModel.ZoomChanged -= OnViewModelZoomChanged;
         ViewModel.ScrollToPageRequested -= OnScrollToPageRequested;
         ViewModel.FocusSearchBoxRequested -= OnFocusSearchBoxRequested;
+        CancelDestinationAlignment();
+        _navigationAlignmentTimer.Tick -= OnNavigationAlignmentTick;
 
         if (_scrollViewer is not null)
         {

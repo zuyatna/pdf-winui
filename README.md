@@ -18,12 +18,17 @@ Its defining feature is a **comfortable Dark Reading Mode**: instead of harshly 
   - Dedicated single-threaded `PdfiumWorker` with a bounded work queue for thread-safe native PDFium execution and deterministic `SafeHandle`/`IDisposable` cleanup.
   - Display-DPI aware rendering (`XamlRoot.RasterizationScale * ZoomFactor`) backed by a byte-budgeted LRU bitmap cache (`256 MB` cap).
 - **Reading & Navigation**
+  - **Table of Contents**: Open the hamburger button to show the PDF's embedded outline or personal bookmarks. Clicking a heading follows its position within the page, including rotated/cropped pages. Destinations without a position fall back to the page top. PDFs without an outline show an empty state.
+  - **Personal Bookmarks**: Press `Ctrl + D` to toggle a bookmark for the current page. In the **Bookmarks** tab, enter a title and use **Save / update bookmark** to add or rename it; click a bookmark to navigate or use its delete button to remove it. Bookmarks are saved locally per file, survive clearing recent files, and do not modify the PDF.
+  - Toggle the **Contents / Bookmarks** sidebar with `Ctrl + B`.
   - Zoom modes: **Fit Width**, **Fit Page**, and **Custom Zoom** (`25%`–`500%`) via toolbar buttons or `Ctrl + Mouse Wheel` with debounced crisp re-rendering.
-  - **Go to Page** (`Ctrl + G`) and live page indicator (`Page X of Y`).
+  - **Go to Page** using the toolbar page box and live page indicator.
   - Per-file view state persistence (automatically restores last visited page and zoom mode/level) and a **Recent Files** list on the home screen.
 - **Interaction Modes & Text Tools**
-  - **Reading Mode (`Read`)**: Pan and scroll pages naturally by clicking and dragging (or double-tap dragging on a trackpad).
-  - **Text Selection Mode (`Select`)**: Drag across text to highlight and copy selected text to the clipboard (`Ctrl + C`).
+  - **Minimal Toolbar**: Hamburger navigation, Open PDF, page controls, zoom controls and an **Advanced** ellipsis menu. Click the zoom percentage for Fit width, Fit page or Actual size.
+  - **Reading Mode**: Pan and scroll pages naturally by clicking and dragging (or double-tap dragging on a trackpad).
+  - **Text Selection Mode**: Enable **Advanced > Text selection**, then drag across text and copy it using **Advanced > Copy selected text** or `Ctrl + C`.
+  - **Advanced Menu**: Find, Dark reading and Appearance are grouped with the text tools; the keyboard shortcuts remain available while the menu is closed.
   - **Full-Document Search**: Find bar (`Ctrl + F`) with highlighted page matches and next/previous navigation (`Enter` / `F3` / `Shift + F3`).
 - **Windows 11 Shell Integration**
   - `.pdf` file type association, command-line file opening (`PdfReader.App.exe "path\to\document.pdf"`), and drag-and-drop onto the app window.
@@ -47,7 +52,7 @@ Its defining feature is a **comfortable Dark Reading Mode**: instead of harshly 
 
 ## Solution Architecture
 
-The repository is organized into three projects in `PdfReader.slnx`:
+The repository is organized into four projects in `PdfReader.slnx`:
 
 ```text
 PdfReader/
@@ -64,7 +69,8 @@ PdfReader/
 │   ├── Services/           # ReaderSettingsService (JSON source-generated persistence)
 │   ├── Strings/en-US/      # Localized UI resources (Resources.resw)
 │   └── ViewModels/         # MainViewModel, PdfPageViewModel, RecentFileItem
-└── PdfReader.Core.Tests/   # MSTest unit & native PDFium integration test suite (net10.0)
+├── PdfReader.Core.Tests/   # MSTest unit & native PDFium integration test suite (net10.0)
+└── PdfReader.Settings.Tests/ # Portable tests of the App settings sources and JSON persistence (net10.0)
 ```
 
 ---
@@ -91,6 +97,9 @@ dotnet build .\PdfReader.slnx -c Debug -p:Platform=x64
 
 # Run the Core unit and native PDFium integration test suite
 dotnet test .\PdfReader.Core.Tests\PdfReader.Core.Tests.csproj -c Debug
+
+# Run settings and bookmark persistence integration tests
+dotnet test .\PdfReader.Settings.Tests\PdfReader.Settings.Tests.csproj -c Debug
 ```
 
 To build optimized `Release` binaries for `x64` or `ARM64`:
