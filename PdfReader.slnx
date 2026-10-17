@@ -10,5 +10,6 @@
     <Platform Solution="*|x86" Project="x86" />
     <Deploy />
   </Project>
+  <Project Path="PdfReader.Core.Tests/PdfReader.Core.Tests.csproj" Id="681cf0e8-7fc1-441b-9453-f48dcd3c0b81" />
   <Project Path="PdfReader.Core/PdfReader.Core.csproj" />
 </Solution>
