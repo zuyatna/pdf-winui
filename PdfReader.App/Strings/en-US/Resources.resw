@@ -232,6 +232,9 @@
   <data name="SearchNoMatches" xml:space="preserve">
     <value>0 / 0</value>
   </data>
+  <data name="DragDropOpenCaption" xml:space="preserve">
+    <value>Open PDF</value>
+  </data>
   <data name="ErrorInfoBar.Title" xml:space="preserve">
     <value>Error</value>
   </data>

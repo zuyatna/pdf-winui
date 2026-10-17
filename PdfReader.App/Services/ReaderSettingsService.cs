@@ -6,11 +6,6 @@ namespace PdfReader.App.Services;
 
 public sealed class ReaderSettingsService
 {
-    private static readonly JsonSerializerOptions s_jsonOptions = new()
-    {
-        WriteIndented = true,
-    };
-
     private readonly string _settingsFilePath;
 
     public ReaderSettingsService(string? settingsFilePath = null)
@@ -36,7 +31,8 @@ public sealed class ReaderSettingsService
             }
 
             string json = File.ReadAllText(_settingsFilePath);
-            return JsonSerializer.Deserialize<ReaderSettings>(json, s_jsonOptions) ?? new ReaderSettings();
+            return JsonSerializer.Deserialize(json, ReaderSettingsJsonContext.Default.ReaderSettings)
+                ?? new ReaderSettings();
         }
         catch
         {
@@ -56,7 +52,7 @@ public sealed class ReaderSettingsService
                 Directory.CreateDirectory(directory);
             }
 
-            string json = JsonSerializer.Serialize(settings, s_jsonOptions);
+            string json = JsonSerializer.Serialize(settings, ReaderSettingsJsonContext.Default.ReaderSettings);
             File.WriteAllText(_settingsFilePath, json);
         }
         catch

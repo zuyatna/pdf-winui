@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
@@ -9,6 +10,7 @@ using Microsoft.UI.Xaml.Media;
 using PdfReader.App.Rendering;
 using PdfReader.App.ViewModels;
 using PdfReader.Core;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 using Windows.Storage;
 using Windows.Storage.Pickers;
@@ -74,6 +76,69 @@ public sealed partial class MainWindow : Window
     }
 
     public MainViewModel ViewModel { get; }
+
+    public void OpenStartupDocument(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return;
+        }
+
+        DispatcherQueue.TryEnqueue(async () =>
+        {
+            await ViewModel.OpenFileAsync(filePath);
+        });
+    }
+
+    private void OnRootGridDragOver(object sender, DragEventArgs e)
+    {
+        if (e.DataView.Contains(StandardDataFormats.StorageItems))
+        {
+            e.AcceptedOperation = DataPackageOperation.Copy;
+            e.DragUIOverride.Caption = ViewModel.DragDropOpenCaption;
+            e.DragUIOverride.IsCaptionVisible = true;
+            e.DragUIOverride.IsGlyphVisible = true;
+        }
+        else
+        {
+            e.AcceptedOperation = DataPackageOperation.None;
+        }
+    }
+
+    private async void OnRootGridDrop(object sender, DragEventArgs e)
+    {
+        if (!e.DataView.Contains(StandardDataFormats.StorageItems))
+        {
+            return;
+        }
+
+        DragOperationDeferral deferral = e.GetDeferral();
+        string? droppedPdfPath = null;
+
+        try
+        {
+            IReadOnlyList<IStorageItem> items = await e.DataView.GetStorageItemsAsync();
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (items[i] is StorageFile file &&
+                    !string.IsNullOrWhiteSpace(file.Path) &&
+                    file.Path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    droppedPdfPath = file.Path;
+                    break;
+                }
+            }
+        }
+        finally
+        {
+            deferral.Complete();
+        }
+
+        if (!string.IsNullOrWhiteSpace(droppedPdfPath))
+        {
+            await ViewModel.OpenFileAsync(droppedPdfPath);
+        }
+    }
 
     private void OnRootGridLoaded(object sender, RoutedEventArgs e)
     {

@@ -203,6 +203,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     public bool IsReadingInteractionMode => !IsTextSelectionMode;
 
+    public string DragDropOpenCaption => GetString("DragDropOpenCaption", "Open PDF");
+
     [RelayCommand]
     public void SetReadingInteractionMode()
     {

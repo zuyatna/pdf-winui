@@ -19,7 +19,11 @@
         x:Name="RootPage"
         Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
         RequestedTheme="{x:Bind ViewModel.RootRequestedTheme, Mode=OneWay}">
-        <Grid x:Name="RootGrid">
+        <Grid
+            x:Name="RootGrid"
+            AllowDrop="True"
+            DragOver="OnRootGridDragOver"
+            Drop="OnRootGridDrop">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
