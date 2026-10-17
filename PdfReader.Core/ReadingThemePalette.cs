@@ -26,4 +26,11 @@ public sealed record ReadingThemePalette(
         RgbColor.DefaultDarkText,
         RgbColor.DefaultDarkCanvas,
         ImageDimAmount: 0.10);
+
+    public static ReadingThemePalette DefaultOled { get; } = new(
+        ReadingThemeMode.Oled,
+        RgbColor.Black,
+        RgbColor.DefaultDarkText,
+        RgbColor.Black,
+        ImageDimAmount: 0.10);
 }

@@ -35,6 +35,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private double _viewportWidthDip = 900.0;
     private double _viewportHeightDip = 700.0;
     private bool _suppressThemeSync;
+    private ReadingThemeMode _lastDarkReadingTheme = ReadingThemeMode.Dark;
     private bool _isUpdatingPageFromScroll;
     private bool _disposed;
 
@@ -159,6 +160,50 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public partial string DarkCanvasHex { get; set; } = ReaderSettings.DefaultDarkCanvasHex;
 
     [ObservableProperty]
+    public partial string OledPageBackgroundHex { get; set; } = ReaderSettings.DefaultOledPageBackgroundHex;
+
+    [ObservableProperty]
+    public partial string OledTextHex { get; set; } = ReaderSettings.DefaultOledTextHex;
+
+    [ObservableProperty]
+    public partial string OledCanvasHex { get; set; } = ReaderSettings.DefaultOledCanvasHex;
+
+    private bool IsOledPalette => SelectedReadingThemeIndex == (int)ReadingThemeMode.Oled;
+
+    public string PageBackgroundHex
+    {
+        get => IsOledPalette ? OledPageBackgroundHex : DarkPageBackgroundHex;
+        set
+        {
+            if (IsOledPalette) { OledPageBackgroundHex = value; }
+            else { DarkPageBackgroundHex = value; }
+            OnPropertyChanged();
+        }
+    }
+
+    public string TextHex
+    {
+        get => IsOledPalette ? OledTextHex : DarkTextHex;
+        set
+        {
+            if (IsOledPalette) { OledTextHex = value; }
+            else { DarkTextHex = value; }
+            OnPropertyChanged();
+        }
+    }
+
+    public string CanvasHex
+    {
+        get => IsOledPalette ? OledCanvasHex : DarkCanvasHex;
+        set
+        {
+            if (IsOledPalette) { OledCanvasHex = value; }
+            else { DarkCanvasHex = value; }
+            OnPropertyChanged();
+        }
+    }
+
+    [ObservableProperty]
     public partial double ImageDimPercentage { get; set; } = ReaderSettings.DefaultImageDimPercentage;
 
     [ObservableProperty]
@@ -230,9 +275,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     [RelayCommand]
     public void ToggleDarkReadingMode()
     {
-        SelectedReadingThemeIndex = SelectedReadingThemeIndex == (int)ReadingThemeMode.Dark
-            ? (int)ReadingThemeMode.Original
-            : (int)ReadingThemeMode.Dark;
+        IsDarkReadingMode = !IsDarkReadingMode;
     }
 
     [RelayCommand]
@@ -546,9 +589,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     [RelayCommand]
     public void ApplyPalette()
     {
-        if (!RgbColor.TryParseHex(DarkPageBackgroundHex, out RgbColor pageBg) ||
-            !RgbColor.TryParseHex(DarkTextHex, out RgbColor text) ||
-            !RgbColor.TryParseHex(DarkCanvasHex, out RgbColor canvas))
+        if (!RgbColor.TryParseHex(PageBackgroundHex, out RgbColor pageBg) ||
+            !RgbColor.TryParseHex(TextHex, out RgbColor text) ||
+            !RgbColor.TryParseHex(CanvasHex, out RgbColor canvas))
         {
             ErrorMessage = GetString(
                 "StatusInvalidColorHex",
@@ -559,9 +602,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         IsErrorOpen = false;
         ErrorMessage = null;
-        DarkPageBackgroundHex = pageBg.ToHex();
-        DarkTextHex = text.ToHex();
-        DarkCanvasHex = canvas.ToHex();
+        PageBackgroundHex = pageBg.ToHex();
+        TextHex = text.ToHex();
+        CanvasHex = canvas.ToHex();
 
         PersistAndApplyReadingTheme();
     }
@@ -572,9 +615,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         _suppressThemeSync = true;
         try
         {
-            DarkPageBackgroundHex = ReaderSettings.DefaultDarkPageBackgroundHex;
-            DarkTextHex = ReaderSettings.DefaultDarkTextHex;
-            DarkCanvasHex = ReaderSettings.DefaultDarkCanvasHex;
+            PageBackgroundHex = IsOledPalette ? ReaderSettings.DefaultOledPageBackgroundHex : ReaderSettings.DefaultDarkPageBackgroundHex;
+            TextHex = IsOledPalette ? ReaderSettings.DefaultOledTextHex : ReaderSettings.DefaultDarkTextHex;
+            CanvasHex = IsOledPalette ? ReaderSettings.DefaultOledCanvasHex : ReaderSettings.DefaultDarkCanvasHex;
             ImageDimPercentage = ReaderSettings.DefaultImageDimPercentage;
         }
         finally
@@ -864,7 +907,15 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         _suppressThemeSync = true;
         try
         {
-            IsDarkReadingMode = value == (int)ReadingThemeMode.Dark;
+            IsDarkReadingMode = value is (int)ReadingThemeMode.Dark or (int)ReadingThemeMode.Oled;
+            if (IsDarkReadingMode)
+            {
+                _lastDarkReadingTheme = (ReadingThemeMode)value;
+            }
+
+            OnPropertyChanged(nameof(PageBackgroundHex));
+            OnPropertyChanged(nameof(TextHex));
+            OnPropertyChanged(nameof(CanvasHex));
         }
         finally
         {
@@ -882,7 +933,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         SelectedReadingThemeIndex = value
-            ? (int)ReadingThemeMode.Dark
+            ? (int)_lastDarkReadingTheme
             : (int)ReadingThemeMode.Original;
     }
 
@@ -1042,10 +1093,17 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             SelectedUiThemeIndex = (int)settings.UiTheme;
             SelectedReadingThemeIndex = (int)settings.ReadingTheme;
-            IsDarkReadingMode = settings.ReadingTheme == ReadingThemeMode.Dark;
+            IsDarkReadingMode = settings.ReadingTheme is ReadingThemeMode.Dark or ReadingThemeMode.Oled;
+            if (IsDarkReadingMode)
+            {
+                _lastDarkReadingTheme = settings.ReadingTheme;
+            }
             DarkPageBackgroundHex = settings.DarkPageBackgroundHex;
             DarkTextHex = settings.DarkTextHex;
             DarkCanvasHex = settings.DarkCanvasHex;
+            OledPageBackgroundHex = settings.OledPageBackgroundHex ?? ReaderSettings.DefaultOledPageBackgroundHex;
+            OledTextHex = settings.OledTextHex ?? ReaderSettings.DefaultOledTextHex;
+            OledCanvasHex = settings.OledCanvasHex ?? ReaderSettings.DefaultOledCanvasHex;
             ImageDimPercentage = Math.Clamp(settings.ImageDimPercentage, 0.0, 50.0);
             _recentDocumentStates = settings.RecentDocuments ?? [];
             _bookmarkedDocumentStates = settings.BookmarkedDocuments ?? [];
@@ -1122,12 +1180,15 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             UiTheme = Enum.IsDefined(typeof(AppUiTheme), SelectedUiThemeIndex)
                 ? (AppUiTheme)SelectedUiThemeIndex
                 : AppUiTheme.System,
-            ReadingTheme = SelectedReadingThemeIndex == (int)ReadingThemeMode.Original
-                ? ReadingThemeMode.Original
+            ReadingTheme = Enum.IsDefined(typeof(ReadingThemeMode), SelectedReadingThemeIndex)
+                ? (ReadingThemeMode)SelectedReadingThemeIndex
                 : ReadingThemeMode.Dark,
             DarkPageBackgroundHex = DarkPageBackgroundHex,
             DarkTextHex = DarkTextHex,
             DarkCanvasHex = DarkCanvasHex,
+            OledPageBackgroundHex = OledPageBackgroundHex,
+            OledTextHex = OledTextHex,
+            OledCanvasHex = OledCanvasHex,
             ImageDimPercentage = Math.Clamp(ImageDimPercentage, 0.0, 50.0),
             RecentDocuments = _recentDocumentStates,
             BookmarkedDocuments = _bookmarkedDocumentStates,
@@ -1145,19 +1206,12 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         ReadingThemePalette palette = settings.ToReadingThemePalette();
 
-        RgbColor darkBg = RgbColor.TryParseHex(settings.DarkPageBackgroundHex, out RgbColor pBg)
-            ? pBg
-            : RgbColor.DefaultDarkPageBackground;
-        RgbColor darkText = RgbColor.TryParseHex(settings.DarkTextHex, out RgbColor pText)
-            ? pText
-            : RgbColor.DefaultDarkText;
-        RgbColor darkCanvas = RgbColor.TryParseHex(settings.DarkCanvasHex, out RgbColor pCanvas)
-            ? pCanvas
-            : RgbColor.DefaultDarkCanvas;
-
-        SwatchPageBackgroundBrush = new SolidColorBrush(PageThemeProcessor.ToUiColor(darkBg));
-        SwatchTextBrush = new SolidColorBrush(PageThemeProcessor.ToUiColor(darkText));
-        SwatchCanvasBrush = new SolidColorBrush(PageThemeProcessor.ToUiColor(darkCanvas));
+        ReadingThemePalette editorPalette = palette.IsRemapEnabled
+            ? palette
+            : (settings with { ReadingTheme = ReadingThemeMode.Dark }).ToReadingThemePalette();
+        SwatchPageBackgroundBrush = new SolidColorBrush(PageThemeProcessor.ToUiColor(editorPalette.PageBackground));
+        SwatchTextBrush = new SolidColorBrush(PageThemeProcessor.ToUiColor(editorPalette.Text));
+        SwatchCanvasBrush = new SolidColorBrush(PageThemeProcessor.ToUiColor(editorPalette.Canvas));
 
         CanvasBackgroundBrush = palette.IsRemapEnabled
             ? new SolidColorBrush(PageThemeProcessor.ToUiColor(palette.Canvas))

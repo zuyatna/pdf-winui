@@ -6,6 +6,18 @@ namespace PdfReader.Core.Tests;
 public sealed class LuminanceRemapTests
 {
     [TestMethod]
+    public void OledRemapMapsPaperToPureBlackAndInkToWarmText()
+    {
+        ReadingThemePalette palette = ReadingThemePalette.DefaultOled;
+
+        LuminanceRemapMatrix matrix = LuminanceRemapCalculator.CreateRemap(palette.PageBackground, palette.Text);
+
+        Assert.AreEqual(RgbColor.Black, matrix.Evaluate(RgbColor.White));
+        Assert.AreEqual(RgbColor.DefaultDarkText, matrix.Evaluate(RgbColor.Black));
+        Assert.AreEqual(new RgbColor(125, 124, 122), matrix.Evaluate(new RgbColor(128, 128, 128)));
+    }
+
+    [TestMethod]
     public void CreateRemap_MapsBlackToTextColor_AndWhiteToPageBackground()
     {
         // Arrange: Claude dark reading defaults (#262624 background, #FAF9F5 text)

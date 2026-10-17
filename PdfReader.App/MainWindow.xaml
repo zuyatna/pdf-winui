@@ -255,6 +255,7 @@
                                 SelectedIndex="{x:Bind ViewModel.SelectedReadingThemeIndex, Mode=TwoWay}">
                                 <ComboBoxItem x:Uid="ReadingThemeOriginalItem" Content="Original (Unchanged)" />
                                 <ComboBoxItem x:Uid="ReadingThemeDarkItem" Content="Dark (Warm Palette)" />
+                                <ComboBoxItem x:Uid="ReadingThemeOledItem" Content="OLED (Pure Black)" />
                             </ComboBox>
 
                             <Border
@@ -275,7 +276,7 @@
                                     x:Uid="PageBackgroundHexBox"
                                     Grid.Column="0"
                                     Header="Page background (paper)"
-                                    Text="{x:Bind ViewModel.DarkPageBackgroundHex, Mode=TwoWay}" />
+                                    Text="{x:Bind ViewModel.PageBackgroundHex, Mode=TwoWay}" />
                                 <Border
                                     Grid.Column="1"
                                     Height="32"
@@ -295,7 +296,7 @@
                                     x:Uid="TextColorHexBox"
                                     Grid.Column="0"
                                     Header="Text color (ink)"
-                                    Text="{x:Bind ViewModel.DarkTextHex, Mode=TwoWay}" />
+                                    Text="{x:Bind ViewModel.TextHex, Mode=TwoWay}" />
                                 <Border
                                     Grid.Column="1"
                                     Height="32"
@@ -315,7 +316,7 @@
                                     x:Uid="CanvasColorHexBox"
                                     Grid.Column="0"
                                     Header="Canvas background (around pages)"
-                                    Text="{x:Bind ViewModel.DarkCanvasHex, Mode=TwoWay}" />
+                                    Text="{x:Bind ViewModel.CanvasHex, Mode=TwoWay}" />
                                 <Border
                                     Grid.Column="1"
                                     Height="32"
