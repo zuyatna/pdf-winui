@@ -13,6 +13,7 @@ using Microsoft.Windows.ApplicationModel.Resources;
 using PdfReader.App.Rendering;
 using PdfReader.App.Services;
 using PdfReader.Core;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace PdfReader.App.ViewModels;
 
@@ -24,7 +25,12 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly Func<Task<string?>> _pickPdfFileAsync;
     private readonly ResourceLoader? _resourceLoader;
     private IReadOnlyList<DocumentViewState> _recentDocumentStates = [];
+    private IReadOnlyList<PdfSearchMatch> _searchMatches = [];
+    private int _activeSearchMatchIndex = -1;
+    private int _selectedPageIndex = -1;
     private CancellationTokenSource? _openCts;
+    private CancellationTokenSource? _searchCts;
+    private CancellationTokenSource? _selectionCts;
     private string? _currentFilePath;
     private double _viewportWidthDip = 900.0;
     private double _viewportHeightDip = 700.0;
@@ -50,6 +56,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         WindowTitle = GetString("AppDisplayName", "PDF Reader");
         StatusMessage = GetString("StatusReady", "Ready");
+        SearchStatusText = GetString("SearchNoMatches", "0 / 0");
 
         ReaderSettings initialSettings = _settingsService.Load();
         ApplyLoadedSettings(initialSettings);
@@ -64,6 +71,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public event EventHandler? ZoomChanged;
 
     public event EventHandler<int>? ScrollToPageRequested;
+
+    public event EventHandler? FocusSearchBoxRequested;
 
     public ObservableCollection<PdfPageItem> Pages { get; } = [];
 
@@ -103,6 +112,30 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     [ObservableProperty]
     public partial string GoToPageInput { get; set; } = "1";
+
+    [ObservableProperty]
+    public partial string SelectedText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool HasTextSelection { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsTextSelectionMode { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsSearchBarOpen { get; set; }
+
+    [ObservableProperty]
+    public partial string SearchQuery { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool SearchMatchCase { get; set; }
+
+    [ObservableProperty]
+    public partial string SearchStatusText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool HasSearchMatches { get; set; }
 
     [ObservableProperty]
     public partial bool IsSettingsPaneOpen { get; set; }
@@ -154,6 +187,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     public Visibility DocumentVisibility => HasDocument ? Visibility.Visible : Visibility.Collapsed;
 
+    public Visibility SearchBarVisibility => HasDocument && IsSearchBarOpen ? Visibility.Visible : Visibility.Collapsed;
+
     public Visibility RecentFilesVisibility => !HasDocument && RecentFiles.Count > 0
         ? Visibility.Visible
         : Visibility.Collapsed;
@@ -165,6 +200,20 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public bool IsFitWidthActive => ActiveZoomMode == ZoomMode.FitWidth;
 
     public bool IsFitPageActive => ActiveZoomMode == ZoomMode.FitPage;
+
+    public bool IsReadingInteractionMode => !IsTextSelectionMode;
+
+    [RelayCommand]
+    public void SetReadingInteractionMode()
+    {
+        IsTextSelectionMode = false;
+    }
+
+    [RelayCommand]
+    public void SetTextSelectionMode()
+    {
+        IsTextSelectionMode = true;
+    }
 
     [RelayCommand]
     public void ToggleSettingsPane()
@@ -178,6 +227,177 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         SelectedReadingThemeIndex = SelectedReadingThemeIndex == (int)ReadingThemeMode.Dark
             ? (int)ReadingThemeMode.Original
             : (int)ReadingThemeMode.Dark;
+    }
+
+    [RelayCommand]
+    public void ToggleSearchBar()
+    {
+        if (!HasDocument)
+        {
+            return;
+        }
+
+        IsSearchBarOpen = !IsSearchBarOpen;
+        if (IsSearchBarOpen)
+        {
+            FocusSearchBoxRequested?.Invoke(this, EventArgs.Empty);
+        }
+        else
+        {
+            ClearSearchHighlights();
+        }
+    }
+
+    [RelayCommand]
+    public void OpenSearchBar()
+    {
+        if (!HasDocument)
+        {
+            return;
+        }
+
+        IsSearchBarOpen = true;
+        FocusSearchBoxRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    [RelayCommand]
+    public void CloseSearchBar()
+    {
+        IsSearchBarOpen = false;
+        ClearSearchHighlights();
+    }
+
+    [RelayCommand]
+    public async Task ExecuteSearchAsync()
+    {
+        if (_disposed || !HasDocument)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            ClearSearchHighlights();
+            return;
+        }
+
+        var newCts = new CancellationTokenSource();
+        CancellationTokenSource? prevCts = Interlocked.Exchange(ref _searchCts, newCts);
+        if (prevCts is not null)
+        {
+            await prevCts.CancelAsync();
+            prevCts.Dispose();
+        }
+
+        CancellationToken cancellationToken = newCts.Token;
+
+        try
+        {
+            IReadOnlyList<PdfSearchMatch> matches = await _documentService.SearchDocumentAsync(
+                SearchQuery,
+                SearchMatchCase,
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ApplySearchMatches(matches);
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer search request.
+        }
+    }
+
+    [RelayCommand]
+    public void NextSearchMatch()
+    {
+        if (_searchMatches.Count == 0)
+        {
+            return;
+        }
+
+        int nextIndex = (_activeSearchMatchIndex + 1) % _searchMatches.Count;
+        FocusSearchMatchAt(nextIndex);
+    }
+
+    [RelayCommand]
+    public void PreviousSearchMatch()
+    {
+        if (_searchMatches.Count == 0)
+        {
+            return;
+        }
+
+        int prevIndex = (_activeSearchMatchIndex - 1 + _searchMatches.Count) % _searchMatches.Count;
+        FocusSearchMatchAt(prevIndex);
+    }
+
+    [RelayCommand]
+    public void CopySelectedText()
+    {
+        if (!HasTextSelection || string.IsNullOrEmpty(SelectedText))
+        {
+            return;
+        }
+
+        var dataPackage = new DataPackage();
+        dataPackage.SetText(SelectedText);
+        Clipboard.SetContent(dataPackage);
+        Clipboard.Flush();
+
+        StatusMessage = GetString("StatusTextCopied", "Copied selected text to clipboard");
+    }
+
+    public async Task RequestPageTextSelectionAsync(
+        int pageIndex,
+        double startNormalizedX,
+        double startNormalizedY,
+        double endNormalizedX,
+        double endNormalizedY)
+    {
+        if (_disposed || !HasDocument || pageIndex < 0 || pageIndex >= Pages.Count)
+        {
+            return;
+        }
+
+        var newCts = new CancellationTokenSource();
+        CancellationTokenSource? prevCts = Interlocked.Exchange(ref _selectionCts, newCts);
+        if (prevCts is not null)
+        {
+            await prevCts.CancelAsync();
+            prevCts.Dispose();
+        }
+
+        CancellationToken cancellationToken = newCts.Token;
+
+        try
+        {
+            PdfTextSelection? selection = await _documentService.SelectTextAsync(
+                pageIndex,
+                startNormalizedX,
+                startNormalizedY,
+                endNormalizedX,
+                endNormalizedY,
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ApplyTextSelection(selection);
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer pointer drag position.
+        }
+    }
+
+    public void ClearTextSelection()
+    {
+        if (_selectedPageIndex >= 0 && _selectedPageIndex < Pages.Count)
+        {
+            Pages[_selectedPageIndex].SelectionRects = [];
+        }
+
+        _selectedPageIndex = -1;
+        SelectedText = string.Empty;
+        HasTextSelection = false;
     }
 
     [RelayCommand]
@@ -417,6 +637,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         IsBusy = true;
         IsErrorOpen = false;
         ErrorMessage = null;
+        ClearTextSelection();
+        ClearSearchHighlights();
         StatusMessage = string.Format(
             CultureInfo.CurrentCulture,
             GetString("StatusOpeningFormat", "Opening {0}..."),
@@ -455,7 +677,14 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             Pages.Clear();
             for (int i = 0; i < metadata.PageCount; i++)
             {
-                Pages.Add(new PdfPageItem(i, metadata.PageSizes[i], restoredZoom, PageCardBackgroundBrush));
+                Pages.Add(new PdfPageItem(
+                    i,
+                    metadata.PageSizes[i],
+                    restoredZoom,
+                    PageCardBackgroundBrush,
+                    IsTextSelectionMode,
+                    RequestPageTextSelectionAsync,
+                    ClearTextSelection));
             }
 
             _currentFilePath = fullPath;
@@ -515,12 +744,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         _disposed = true;
 
-        if (_openCts is not null)
-        {
-            await _openCts.CancelAsync();
-            _openCts.Dispose();
-            _openCts = null;
-        }
+        await CancelAndDisposeAsync(Interlocked.Exchange(ref _openCts, null));
+        await CancelAndDisposeAsync(Interlocked.Exchange(ref _searchCts, null));
+        await CancelAndDisposeAsync(Interlocked.Exchange(ref _selectionCts, null));
 
         _renderPipeline.Dispose();
         await _documentService.DisposeAsync();
@@ -530,8 +756,36 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         OnPropertyChanged(nameof(EmptyStateVisibility));
         OnPropertyChanged(nameof(DocumentVisibility));
+        OnPropertyChanged(nameof(SearchBarVisibility));
         OnPropertyChanged(nameof(RecentFilesVisibility));
         OnPropertyChanged(nameof(TotalPagesSuffixText));
+    }
+
+    partial void OnIsTextSelectionModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsReadingInteractionMode));
+        foreach (PdfPageItem page in Pages)
+        {
+            page.IsTextSelectionMode = value;
+        }
+
+        if (!value)
+        {
+            ClearTextSelection();
+        }
+    }
+
+    partial void OnIsSearchBarOpenChanged(bool value)
+    {
+        OnPropertyChanged(nameof(SearchBarVisibility));
+    }
+
+    partial void OnSearchMatchCaseChanged(bool value)
+    {
+        if (HasDocument && IsSearchBarOpen && !string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            _ = ExecuteSearchAsync();
+        }
     }
 
     partial void OnTotalPagesChanged(int value)
@@ -608,6 +862,111 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         PersistAndApplyReadingTheme();
+    }
+
+    private void ApplyTextSelection(PdfTextSelection? selection)
+    {
+        if (selection is null || string.IsNullOrWhiteSpace(selection.SelectedText))
+        {
+            ClearTextSelection();
+            return;
+        }
+
+        if (_selectedPageIndex >= 0 && _selectedPageIndex < Pages.Count && _selectedPageIndex != selection.PageIndex)
+        {
+            Pages[_selectedPageIndex].SelectionRects = [];
+        }
+
+        _selectedPageIndex = selection.PageIndex;
+        if (_selectedPageIndex >= 0 && _selectedPageIndex < Pages.Count)
+        {
+            Pages[_selectedPageIndex].SelectionRects = selection.HighlightRects;
+        }
+
+        SelectedText = selection.SelectedText;
+        HasTextSelection = true;
+    }
+
+    private void ApplySearchMatches(IReadOnlyList<PdfSearchMatch> matches)
+    {
+        foreach (PdfPageItem page in Pages)
+        {
+            page.SearchHighlightRects = [];
+            page.ActiveSearchHighlightRects = [];
+        }
+
+        _searchMatches = matches;
+        if (matches.Count == 0)
+        {
+            _activeSearchMatchIndex = -1;
+            HasSearchMatches = false;
+            SearchStatusText = GetString("SearchNoMatches", "0 / 0");
+            return;
+        }
+
+        var rectsByPage = new Dictionary<int, List<NormalizedRect>>();
+        foreach (PdfSearchMatch match in matches)
+        {
+            if (!rectsByPage.TryGetValue(match.PageIndex, out List<NormalizedRect>? pageRects))
+            {
+                pageRects = [];
+                rectsByPage[match.PageIndex] = pageRects;
+            }
+
+            pageRects.AddRange(match.HighlightRects);
+        }
+
+        foreach ((int pageIndex, List<NormalizedRect> rects) in rectsByPage)
+        {
+            if (pageIndex >= 0 && pageIndex < Pages.Count)
+            {
+                Pages[pageIndex].SearchHighlightRects = rects.AsReadOnly();
+            }
+        }
+
+        HasSearchMatches = true;
+        FocusSearchMatchAt(0);
+    }
+
+    private void FocusSearchMatchAt(int matchIndex)
+    {
+        if (_searchMatches.Count == 0 || matchIndex < 0 || matchIndex >= _searchMatches.Count)
+        {
+            return;
+        }
+
+        if (_activeSearchMatchIndex >= 0 && _activeSearchMatchIndex < _searchMatches.Count)
+        {
+            int oldPageIdx = _searchMatches[_activeSearchMatchIndex].PageIndex;
+            if (oldPageIdx >= 0 && oldPageIdx < Pages.Count)
+            {
+                Pages[oldPageIdx].ActiveSearchHighlightRects = [];
+            }
+        }
+
+        _activeSearchMatchIndex = matchIndex;
+        PdfSearchMatch activeMatch = _searchMatches[matchIndex];
+        if (activeMatch.PageIndex >= 0 && activeMatch.PageIndex < Pages.Count)
+        {
+            Pages[activeMatch.PageIndex].ActiveSearchHighlightRects = activeMatch.HighlightRects;
+        }
+
+        SearchStatusText = $"{matchIndex + 1} / {_searchMatches.Count}";
+        NavigateToPageNumber(activeMatch.PageIndex + 1);
+    }
+
+    private void ClearSearchHighlights()
+    {
+        _searchMatches = [];
+        _activeSearchMatchIndex = -1;
+        HasSearchMatches = false;
+        SearchStatusText = GetString("SearchNoMatches", "0 / 0");
+
+        foreach (PdfPageItem page in Pages)
+        {
+            page.SearchHighlightRects = [];
+            page.ActiveSearchHighlightRects = [];
+        }
     }
 
     private void NavigateToPageNumber(int targetPageNumber)
@@ -775,6 +1134,15 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         return _renderPipeline.SetReadingTheme(palette);
+    }
+
+    private static async Task CancelAndDisposeAsync(CancellationTokenSource? cts)
+    {
+        if (cts is not null)
+        {
+            await cts.CancelAsync();
+            cts.Dispose();
+        }
     }
 
     private static ResourceLoader? TryCreateResourceLoader()

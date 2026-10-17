@@ -13,6 +13,10 @@ public sealed class PdfDocumentService : IPdfDocumentService
     private const int FpdfPageObjImage = 3;
     private const int FpdfPageObjForm = 5;
     private const int MaxFormRecursionDepth = 8;
+    private const int ReferenceDeviceScale = 100000;
+    private const double HitTestDirectTolerancePoints = 12.0;
+    private const double HitTestFallbackTolerancePoints = 48.0;
+    private const ulong FpdfMatchCaseFlag = 0x00000001UL;
 
     private static int s_libraryRefCount;
 
@@ -128,21 +132,10 @@ public sealed class PdfDocumentService : IPdfDocumentService
         return _worker.RunAsync(
             () =>
             {
-                ObjectDisposedException.ThrowIf(_disposed, this);
-
-                if (_documentResource is null || _currentDocument is null)
-                {
-                    throw new InvalidOperationException("No PDF document is currently open.");
-                }
-
-                if (pageIndex < 0 || pageIndex >= _currentDocument.PageCount)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range.");
-                }
-
+                EnsureOpenPageIndexOnWorker(pageIndex);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                using NativeResource<FpdfPageT> page = LoadPageOnWorker(_documentResource.Handle, pageIndex);
+                using NativeResource<FpdfPageT> page = LoadPageOnWorker(_documentResource!.Handle, pageIndex);
                 IReadOnlyList<PixelRect> imageBounds = CollectImageBoundsOnWorker(page.Handle, targetSize);
 
                 using NativeResource<FpdfBitmapT> bitmap = CreateBitmapOnWorker(targetSize.Width, targetSize.Height);
@@ -188,6 +181,175 @@ public sealed class PdfDocumentService : IPdfDocumentService
             cancellationToken);
     }
 
+    public Task<string> GetPageTextAsync(int pageIndex, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed), this);
+
+        return _worker.RunAsync(
+            () =>
+            {
+                EnsureOpenPageIndexOnWorker(pageIndex);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                using NativeResource<FpdfPageT> page = LoadPageOnWorker(_documentResource!.Handle, pageIndex);
+                using NativeResource<FpdfTextpageT> textPage = LoadTextPageOnWorker(page.Handle, pageIndex);
+
+                int charCount = fpdf_text.FPDFTextCountChars(textPage.Handle);
+                if (charCount <= 0)
+                {
+                    return string.Empty;
+                }
+
+                return ExtractTextSegmentOnWorker(textPage.Handle, 0, charCount);
+            },
+            cancellationToken);
+    }
+
+    public Task<PdfTextSelection?> SelectTextAsync(
+        int pageIndex,
+        double startNormalizedX,
+        double startNormalizedY,
+        double endNormalizedX,
+        double endNormalizedY,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed), this);
+
+        double clampedStartX = Math.Clamp(startNormalizedX, 0.0, 1.0);
+        double clampedStartY = Math.Clamp(startNormalizedY, 0.0, 1.0);
+        double clampedEndX = Math.Clamp(endNormalizedX, 0.0, 1.0);
+        double clampedEndY = Math.Clamp(endNormalizedY, 0.0, 1.0);
+
+        return _worker.RunAsync(
+            () =>
+            {
+                EnsureOpenPageIndexOnWorker(pageIndex);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                using NativeResource<FpdfPageT> page = LoadPageOnWorker(_documentResource!.Handle, pageIndex);
+                using NativeResource<FpdfTextpageT> textPage = LoadTextPageOnWorker(page.Handle, pageIndex);
+
+                int charCount = fpdf_text.FPDFTextCountChars(textPage.Handle);
+                if (charCount <= 0)
+                {
+                    return null;
+                }
+
+                if (!TryNormalizedDeviceToPageOnWorker(page.Handle, clampedStartX, clampedStartY, out double startPdfX, out double startPdfY) ||
+                    !TryNormalizedDeviceToPageOnWorker(page.Handle, clampedEndX, clampedEndY, out double endPdfX, out double endPdfY))
+                {
+                    return null;
+                }
+
+                int startIndex = FindCharIndexNearPointOnWorker(textPage.Handle, charCount, startPdfX, startPdfY);
+                int endIndex = FindCharIndexNearPointOnWorker(textPage.Handle, charCount, endPdfX, endPdfY);
+                if (startIndex < 0 && endIndex < 0)
+                {
+                    return null;
+                }
+
+                if (startIndex < 0)
+                {
+                    startIndex = endIndex;
+                }
+                else if (endIndex < 0)
+                {
+                    endIndex = startIndex;
+                }
+
+                int firstChar = Math.Min(startIndex, endIndex);
+                int lastChar = Math.Max(startIndex, endIndex);
+                int selectedCount = lastChar - firstChar + 1;
+
+                string selectedText = ExtractTextSegmentOnWorker(textPage.Handle, firstChar, selectedCount);
+                if (string.IsNullOrWhiteSpace(selectedText))
+                {
+                    return null;
+                }
+
+                IReadOnlyList<NormalizedRect> rects = ExtractRangeRectsOnWorker(
+                    page.Handle,
+                    textPage.Handle,
+                    firstChar,
+                    selectedCount);
+
+                return new PdfTextSelection(pageIndex, firstChar, selectedCount, selectedText, rects);
+            },
+            cancellationToken);
+    }
+
+    public Task<IReadOnlyList<PdfSearchMatch>> SearchDocumentAsync(
+        string query,
+        bool matchCase = false,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed), this);
+
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Task.FromResult<IReadOnlyList<PdfSearchMatch>>(Array.Empty<PdfSearchMatch>());
+        }
+
+        string trimmedQuery = query.Trim();
+
+        return _worker.RunAsync<IReadOnlyList<PdfSearchMatch>>(
+            () =>
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+
+                if (_documentResource is null || _currentDocument is null)
+                {
+                    throw new InvalidOperationException("No PDF document is currently open.");
+                }
+
+                ushort[] queryBuffer = new ushort[trimmedQuery.Length + 1];
+                for (int i = 0; i < trimmedQuery.Length; i++)
+                {
+                    queryBuffer[i] = trimmedQuery[i];
+                }
+
+                queryBuffer[trimmedQuery.Length] = 0;
+                ulong flags = matchCase ? FpdfMatchCaseFlag : 0UL;
+
+                var matches = new List<PdfSearchMatch>();
+                for (int pageIndex = 0; pageIndex < _currentDocument.PageCount; pageIndex++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    using NativeResource<FpdfPageT> page = LoadPageOnWorker(_documentResource.Handle, pageIndex);
+                    using NativeResource<FpdfTextpageT> textPage = LoadTextPageOnWorker(page.Handle, pageIndex);
+
+                    FpdfSchhandleT? rawSearch = fpdf_text.FPDFTextFindStart(textPage.Handle, ref queryBuffer[0], flags, 0);
+                    if (rawSearch is null || rawSearch.__Instance == IntPtr.Zero)
+                    {
+                        continue;
+                    }
+
+                    using var searchResource = new NativeResource<FpdfSchhandleT>(rawSearch, fpdf_text.FPDFTextFindClose);
+                    while (fpdf_text.FPDFTextFindNext(searchResource.Handle) != 0)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        int matchStart = fpdf_text.FPDFTextGetSchResultIndex(searchResource.Handle);
+                        int matchCount = fpdf_text.FPDFTextGetSchCount(searchResource.Handle);
+                        if (matchStart >= 0 && matchCount > 0)
+                        {
+                            IReadOnlyList<NormalizedRect> rects = ExtractRangeRectsOnWorker(
+                                page.Handle,
+                                textPage.Handle,
+                                matchStart,
+                                matchCount);
+
+                            matches.Add(new PdfSearchMatch(pageIndex, matchStart, matchCount, rects));
+                        }
+                    }
+                }
+
+                return matches.Count == 0 ? Array.Empty<PdfSearchMatch>() : matches.AsReadOnly();
+            },
+            cancellationToken);
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (Volatile.Read(ref _disposed))
@@ -212,6 +374,163 @@ public sealed class PdfDocumentService : IPdfDocumentService
                 await _worker.DisposeAsync().ConfigureAwait(false);
             }
         }
+    }
+
+    private void EnsureOpenPageIndexOnWorker(int pageIndex)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_documentResource is null || _currentDocument is null)
+        {
+            throw new InvalidOperationException("No PDF document is currently open.");
+        }
+
+        if (pageIndex < 0 || pageIndex >= _currentDocument.PageCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range.");
+        }
+    }
+
+    private static string ExtractTextSegmentOnWorker(FpdfTextpageT textPage, int startIndex, int count)
+    {
+        if (count <= 0)
+        {
+            return string.Empty;
+        }
+
+        ushort[] buffer = new ushort[checked(count + 1)];
+        int written = fpdf_text.FPDFTextGetText(textPage, startIndex, count, ref buffer[0]);
+        if (written <= 1)
+        {
+            return string.Empty;
+        }
+
+        int charLength = Math.Min(written - 1, count);
+        ReadOnlySpan<char> chars = MemoryMarshal.Cast<ushort, char>(buffer.AsSpan(0, charLength));
+        return new string(chars).TrimEnd('\0');
+    }
+
+    private static IReadOnlyList<NormalizedRect> ExtractRangeRectsOnWorker(
+        FpdfPageT page,
+        FpdfTextpageT textPage,
+        int startIndex,
+        int count)
+    {
+        int rectCount = fpdf_text.FPDFTextCountRects(textPage, startIndex, count);
+        if (rectCount <= 0)
+        {
+            return Array.Empty<NormalizedRect>();
+        }
+
+        var rects = new List<NormalizedRect>(rectCount);
+        for (int i = 0; i < rectCount; i++)
+        {
+            double left = 0;
+            double top = 0;
+            double right = 0;
+            double bottom = 0;
+            if (fpdf_text.FPDFTextGetRect(textPage, i, ref left, ref top, ref right, ref bottom) != 0)
+            {
+                int x1 = 0;
+                int y1 = 0;
+                int x2 = 0;
+                int y2 = 0;
+                fpdfview.FPDF_PageToDevice(page, 0, 0, ReferenceDeviceScale, ReferenceDeviceScale, 0, left, top, ref x1, ref y1);
+                fpdfview.FPDF_PageToDevice(page, 0, 0, ReferenceDeviceScale, ReferenceDeviceScale, 0, right, bottom, ref x2, ref y2);
+
+                NormalizedRect norm = NormalizedRect.FromPoints(
+                    x1 / (double)ReferenceDeviceScale,
+                    y1 / (double)ReferenceDeviceScale,
+                    x2 / (double)ReferenceDeviceScale,
+                    y2 / (double)ReferenceDeviceScale);
+
+                if (!norm.IsEmpty)
+                {
+                    rects.Add(norm);
+                }
+            }
+        }
+
+        return rects.Count == 0 ? Array.Empty<NormalizedRect>() : rects.AsReadOnly();
+    }
+
+    private static bool TryNormalizedDeviceToPageOnWorker(
+        FpdfPageT page,
+        double normalizedX,
+        double normalizedY,
+        out double pageX,
+        out double pageY)
+    {
+        int devX = (int)Math.Round(Math.Clamp(normalizedX, 0.0, 1.0) * ReferenceDeviceScale);
+        int devY = (int)Math.Round(Math.Clamp(normalizedY, 0.0, 1.0) * ReferenceDeviceScale);
+        pageX = 0;
+        pageY = 0;
+        return fpdfview.FPDF_DeviceToPage(
+            page,
+            0,
+            0,
+            ReferenceDeviceScale,
+            ReferenceDeviceScale,
+            0,
+            devX,
+            devY,
+            ref pageX,
+            ref pageY) != 0;
+    }
+
+    private static int FindCharIndexNearPointOnWorker(
+        FpdfTextpageT textPage,
+        int charCount,
+        double pdfX,
+        double pdfY)
+    {
+        int directIndex = fpdf_text.FPDFTextGetCharIndexAtPos(
+            textPage,
+            pdfX,
+            pdfY,
+            HitTestDirectTolerancePoints,
+            HitTestDirectTolerancePoints);
+
+        if (directIndex >= 0)
+        {
+            return directIndex;
+        }
+
+        int closestIndex = -1;
+        double closestDistanceSquared = HitTestFallbackTolerancePoints * HitTestFallbackTolerancePoints;
+
+        for (int i = 0; i < charCount; i++)
+        {
+            double left = 0;
+            double right = 0;
+            double bottom = 0;
+            double top = 0;
+            if (fpdf_text.FPDFTextGetCharBox(textPage, i, ref left, ref right, ref bottom, ref top) == 0)
+            {
+                continue;
+            }
+
+            double minX = Math.Min(left, right);
+            double maxX = Math.Max(left, right);
+            double minY = Math.Min(bottom, top);
+            double maxY = Math.Max(bottom, top);
+
+            if (maxX <= minX && maxY <= minY)
+            {
+                continue;
+            }
+
+            double dx = pdfX < minX ? minX - pdfX : (pdfX > maxX ? pdfX - maxX : 0.0);
+            double dy = pdfY < minY ? minY - pdfY : (pdfY > maxY ? pdfY - maxY : 0.0);
+            double distSquared = (dx * dx) + (dy * dy);
+            if (distSquared <= closestDistanceSquared)
+            {
+                closestDistanceSquared = distSquared;
+                closestIndex = i;
+            }
+        }
+
+        return closestIndex;
     }
 
     private static IReadOnlyList<PixelRect> CollectImageBoundsOnWorker(FpdfPageT page, PixelSize targetSize)
@@ -292,6 +611,17 @@ public sealed class PdfDocumentService : IPdfDocumentService
         }
 
         return new NativeResource<FpdfPageT>(rawPage, fpdfview.FPDF_ClosePage);
+    }
+
+    private static NativeResource<FpdfTextpageT> LoadTextPageOnWorker(FpdfPageT page, int pageIndex)
+    {
+        FpdfTextpageT? rawTextPage = fpdf_text.FPDFTextLoadPage(page);
+        if (rawTextPage is null || rawTextPage.__Instance == IntPtr.Zero)
+        {
+            throw new InvalidOperationException($"Failed to load PDF text page {pageIndex}.");
+        }
+
+        return new NativeResource<FpdfTextpageT>(rawTextPage, fpdf_text.FPDFTextClosePage);
     }
 
     private static NativeResource<FpdfBitmapT> CreateBitmapOnWorker(int width, int height)

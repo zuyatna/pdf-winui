@@ -23,6 +23,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
@@ -32,10 +33,11 @@
                 Background="{ThemeResource LayerFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="0,0,0,1">
-                <Grid ColumnSpacing="10">
+                <Grid ColumnSpacing="8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
@@ -133,9 +135,55 @@
                             IsChecked="{x:Bind ViewModel.IsFitPageActive, Mode=OneWay}" />
                     </StackPanel>
 
+                    <StackPanel
+                        Grid.Column="5"
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        Visibility="{x:Bind ViewModel.DocumentVisibility, Mode=OneWay}">
+                        <ToggleButton
+                            x:Uid="ReadingModeButton"
+                            Command="{x:Bind ViewModel.SetReadingInteractionModeCommand}"
+                            IsChecked="{x:Bind ViewModel.IsReadingInteractionMode, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="13" Glyph="&#xE759;" />
+                                <TextBlock x:Uid="ReadingModeButtonText" Text="Read" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton
+                            x:Uid="SelectionModeButton"
+                            Command="{x:Bind ViewModel.SetTextSelectionModeCommand}"
+                            IsChecked="{x:Bind ViewModel.IsTextSelectionMode, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="13" Glyph="&#xE8D2;" />
+                                <TextBlock x:Uid="SelectionModeButtonText" Text="Select" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <Button
+                            x:Uid="CopyTextButton"
+                            Command="{x:Bind ViewModel.CopySelectedTextCommand}"
+                            Content="Copy"
+                            IsEnabled="{x:Bind ViewModel.HasTextSelection, Mode=OneWay}">
+                            <Button.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="C" Modifiers="Control" />
+                            </Button.KeyboardAccelerators>
+                        </Button>
+                        <ToggleButton
+                            x:Uid="FindToggleButton"
+                            Command="{x:Bind ViewModel.ToggleSearchBarCommand}"
+                            IsChecked="{x:Bind ViewModel.IsSearchBarOpen, Mode=OneWay}">
+                            <ToggleButton.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="F" Modifiers="Control" />
+                            </ToggleButton.KeyboardAccelerators>
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="13" Glyph="&#xE721;" />
+                                <TextBlock x:Uid="FindToggleButtonText" Text="Find" />
+                            </StackPanel>
+                        </ToggleButton>
+                    </StackPanel>
+
                     <ToggleButton
                         x:Uid="DarkReadingToggleButton"
-                        Grid.Column="5"
+                        Grid.Column="6"
                         IsChecked="{x:Bind ViewModel.IsDarkReadingMode, Mode=TwoWay}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon FontSize="14" Glyph="&#xE708;" />
@@ -145,7 +193,7 @@
 
                     <Button
                         x:Uid="SettingsButton"
-                        Grid.Column="6"
+                        Grid.Column="7"
                         Command="{x:Bind ViewModel.ToggleSettingsPaneCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <SymbolIcon Symbol="Setting" />
@@ -155,9 +203,77 @@
                 </Grid>
             </Border>
 
+            <Border
+                Grid.Row="1"
+                Padding="16,8"
+                Background="{ThemeResource LayerFillColorAltBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1"
+                Visibility="{x:Bind ViewModel.SearchBarVisibility, Mode=OneWay}">
+                <StackPanel
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal"
+                    Spacing="8">
+                    <TextBox
+                        x:Uid="SearchQueryTextBox"
+                        x:Name="SearchQueryTextBox"
+                        Width="240"
+                        VerticalAlignment="Center"
+                        KeyDown="OnSearchQueryTextBoxKeyDown"
+                        PlaceholderText="Find in document..."
+                        Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button
+                        x:Uid="SearchButton"
+                        Command="{x:Bind ViewModel.ExecuteSearchCommand}"
+                        Content="Search" />
+                    <CheckBox
+                        x:Uid="SearchMatchCaseCheckBox"
+                        MinWidth="0"
+                        Margin="4,0"
+                        VerticalAlignment="Center"
+                        Content="Match case"
+                        IsChecked="{x:Bind ViewModel.SearchMatchCase, Mode=TwoWay}" />
+                    <TextBlock
+                        MinWidth="56"
+                        VerticalAlignment="Center"
+                        Opacity="0.8"
+                        Text="{x:Bind ViewModel.SearchStatusText, Mode=OneWay}"
+                        TextAlignment="Center" />
+                    <Button
+                        x:Uid="SearchPrevButton"
+                        Command="{x:Bind ViewModel.PreviousSearchMatchCommand}"
+                        IsEnabled="{x:Bind ViewModel.HasSearchMatches, Mode=OneWay}"
+                        Padding="8,6">
+                        <Button.KeyboardAccelerators>
+                            <KeyboardAccelerator Key="F3" Modifiers="Shift" />
+                        </Button.KeyboardAccelerators>
+                        <FontIcon FontSize="12" Glyph="&#xE70E;" />
+                    </Button>
+                    <Button
+                        x:Uid="SearchNextButton"
+                        Command="{x:Bind ViewModel.NextSearchMatchCommand}"
+                        IsEnabled="{x:Bind ViewModel.HasSearchMatches, Mode=OneWay}"
+                        Padding="8,6">
+                        <Button.KeyboardAccelerators>
+                            <KeyboardAccelerator Key="F3" />
+                        </Button.KeyboardAccelerators>
+                        <FontIcon FontSize="12" Glyph="&#xE70D;" />
+                    </Button>
+                    <Button
+                        x:Uid="SearchCloseButton"
+                        Command="{x:Bind ViewModel.CloseSearchBarCommand}"
+                        Padding="8,6">
+                        <Button.KeyboardAccelerators>
+                            <KeyboardAccelerator Key="Escape" />
+                        </Button.KeyboardAccelerators>
+                        <FontIcon FontSize="12" Glyph="&#xE711;" />
+                    </Button>
+                </StackPanel>
+            </Border>
+
             <InfoBar
                 x:Uid="ErrorInfoBar"
-                Grid.Row="1"
+                Grid.Row="2"
                 Title="Error"
                 IsClosable="True"
                 IsOpen="{x:Bind ViewModel.IsErrorOpen, Mode=TwoWay}"
@@ -165,7 +281,7 @@
                 Severity="Error" />
 
             <SplitView
-                Grid.Row="2"
+                Grid.Row="3"
                 DisplayMode="Inline"
                 IsPaneOpen="{x:Bind ViewModel.IsSettingsPaneOpen, Mode=TwoWay}"
                 OpenPaneLength="340"
@@ -391,6 +507,8 @@
                             IsItemClickEnabled="False"
                             ItemsSource="{x:Bind ViewModel.Pages, Mode=OneWay}"
                             PointerWheelChanged="OnPagesListViewPointerWheelChanged"
+                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                            ScrollViewer.HorizontalScrollMode="Enabled"
                             SelectionMode="None"
                             Visibility="{x:Bind ViewModel.DocumentVisibility, Mode=OneWay}">
                             <ListView.ItemsPanel>

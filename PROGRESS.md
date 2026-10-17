@@ -2,7 +2,7 @@
 
 Tracks implementation milestones, automated test coverage, and ECC quality gate status for `PdfReader.slnx`.
 
-- **Current Active Phase**: Phase 3 — Reading basics (`done`)
+- **Current Active Phase**: Phase 4 — Text (`done`)
 - **Last Verified Git Commit**: `1dcf31e` (`feat: win ui rendering pipeline and virtualized reader`)
 - **Quality Gate Policy**: [`AGENTS.md`](./AGENTS.md) & [`SKILL.md`](./SKILL.md) (`0` warnings, `0` errors, all MSTest suites green)
 
@@ -16,7 +16,7 @@ Tracks implementation milestones, automated test coverage, and ECC quality gate 
 | **Phase 1** | Skeleton | `done` | `PDFiumCore` worker & service, LRU bitmap cache, file picker, continuous vertical scroll, virtualized rendering. |
 | **Phase 2** | Dark reading mode | `done` | UI theme + Page reading theme (`#262624` / `#FAF9F5` / `#1F1E1D`), Win2D `ColorMatrixEffect` luminance remap, image preservation, scanned-page detection (`>= 85%`), settings UI. |
 | **Phase 3** | Reading basics | `done` | Zoom (fit width, fit page, `Ctrl`+wheel), go-to-page, page indicator, per-file state persistence, recent files. |
-| **Phase 4** | Text | `todo` | Text selection, copy, search with highlighted results. |
+| **Phase 4** | Text | `done` | Text selection, copy, search with highlighted results. |
 | **Phase 5** | Shell integration | `todo` | `.pdf` file association, CLI/drag-and-drop open, MSIX packaging. |
 
 ---
@@ -100,11 +100,11 @@ Tracks implementation milestones, automated test coverage, and ECC quality gate 
 
 ---
 
-## Phase 4 — Text (`todo`)
+## Phase 4 — Text (`done`)
 
-- [ ] PDFium text page integration on `PdfiumWorker`.
-- [ ] Text selection and copy to clipboard.
-- [ ] Find in document with highlighted match overlays and next/previous navigation.
+- [x] PDFium text page integration on `PdfiumWorker`.
+- [x] Text selection and copy to clipboard.
+- [x] Find in document with highlighted match overlays and next/previous navigation.
 
 ---
 

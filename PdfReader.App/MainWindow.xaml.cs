@@ -1,14 +1,15 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using PdfReader.App.Rendering;
 using PdfReader.App.ViewModels;
 using PdfReader.Core;
+using Windows.Foundation;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.System;
@@ -24,7 +25,15 @@ public sealed partial class MainWindow : Window
 
     private readonly ViewportRenderCoordinator _viewportCoordinator;
     private readonly DispatcherQueueTimer _zoomDebounceTimer;
+    private readonly PointerEventHandler _panPointerPressedHandler;
+    private readonly PointerEventHandler _panPointerMovedHandler;
+    private readonly PointerEventHandler _panPointerReleasedHandler;
+    private readonly PointerEventHandler _panPointerCanceledHandler;
     private ScrollViewer? _scrollViewer;
+    private Point _panStartPosition;
+    private double _panStartHorizontalOffset;
+    private double _panStartVerticalOffset;
+    private bool _isPanning;
     private bool _xamlRootSubscribed;
     private bool _isZoomSettling;
 
@@ -40,13 +49,24 @@ public sealed partial class MainWindow : Window
         _zoomDebounceTimer.IsRepeating = false;
         _zoomDebounceTimer.Tick += OnZoomDebounceTimerTick;
 
+        _panPointerPressedHandler = new PointerEventHandler(OnPagesListViewPointerPressed);
+        _panPointerMovedHandler = new PointerEventHandler(OnPagesListViewPointerMoved);
+        _panPointerReleasedHandler = new PointerEventHandler(OnPagesListViewPointerReleased);
+        _panPointerCanceledHandler = new PointerEventHandler(OnPagesListViewPointerCanceled);
+
         InitializeComponent();
+
+        PagesListView.AddHandler(UIElement.PointerPressedEvent, _panPointerPressedHandler, handledEventsToo: true);
+        PagesListView.AddHandler(UIElement.PointerMovedEvent, _panPointerMovedHandler, handledEventsToo: true);
+        PagesListView.AddHandler(UIElement.PointerReleasedEvent, _panPointerReleasedHandler, handledEventsToo: true);
+        PagesListView.AddHandler(UIElement.PointerCanceledEvent, _panPointerCanceledHandler, handledEventsToo: true);
 
         ViewModel.DocumentLoaded += OnDocumentLoaded;
         ViewModel.ReadingThemeChanged += OnReadingThemeChanged;
         ViewModel.UiThemeChanged += OnUiThemeChanged;
         ViewModel.ZoomChanged += OnViewModelZoomChanged;
         ViewModel.ScrollToPageRequested += OnScrollToPageRequested;
+        ViewModel.FocusSearchBoxRequested += OnFocusSearchBoxRequested;
         RootGrid.Loaded += OnRootGridLoaded;
         PagesListView.Loaded += OnPagesListViewLoaded;
         PagesListView.SizeChanged += OnPagesListViewSizeChanged;
@@ -133,9 +153,108 @@ public sealed partial class MainWindow : Window
         });
     }
 
+    private void OnFocusSearchBoxRequested(object? sender, EventArgs e)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            SearchQueryTextBox.Focus(FocusState.Programmatic);
+            SearchQueryTextBox.SelectAll();
+        });
+    }
+
     private void OnScrollViewerViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
     {
         RefreshViewport(triggerRenders: !_isZoomSettling);
+    }
+
+    private void OnPagesListViewPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (!ViewModel.HasDocument || ViewModel.IsTextSelectionMode)
+        {
+            return;
+        }
+
+        if (e.OriginalSource is DependencyObject source && IsInsideScrollBar(source))
+        {
+            return;
+        }
+
+        PointerPoint point = e.GetCurrentPoint(PagesListView);
+        if (!point.Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        EnsureScrollViewerHooked();
+        if (_scrollViewer is null)
+        {
+            return;
+        }
+
+        _panStartPosition = point.Position;
+        _panStartHorizontalOffset = _scrollViewer.HorizontalOffset;
+        _panStartVerticalOffset = _scrollViewer.VerticalOffset;
+        _isPanning = true;
+        PagesListView.CapturePointer(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void OnPagesListViewPointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_isPanning)
+        {
+            return;
+        }
+
+        if (_scrollViewer is null || ViewModel.IsTextSelectionMode)
+        {
+            EndPanning(e.Pointer);
+            return;
+        }
+
+        PointerPoint point = e.GetCurrentPoint(PagesListView);
+        if (!point.Properties.IsLeftButtonPressed)
+        {
+            EndPanning(e.Pointer);
+            return;
+        }
+
+        Point currentPosition = point.Position;
+        double deltaX = currentPosition.X - _panStartPosition.X;
+        double deltaY = currentPosition.Y - _panStartPosition.Y;
+
+        double targetHorizontalOffset = Math.Clamp(_panStartHorizontalOffset - deltaX, 0.0, _scrollViewer.ScrollableWidth);
+        double targetVerticalOffset = Math.Clamp(_panStartVerticalOffset - deltaY, 0.0, _scrollViewer.ScrollableHeight);
+
+        _scrollViewer.ChangeView(targetHorizontalOffset, targetVerticalOffset, null, disableAnimation: true);
+        e.Handled = true;
+    }
+
+    private void OnPagesListViewPointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_isPanning)
+        {
+            return;
+        }
+
+        EndPanning(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void OnPagesListViewPointerCanceled(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_isPanning)
+        {
+            return;
+        }
+
+        EndPanning(e.Pointer);
+    }
+
+    private void EndPanning(Pointer pointer)
+    {
+        _isPanning = false;
+        PagesListView.ReleasePointerCapture(pointer);
     }
 
     private void OnPagesListViewPointerWheelChanged(object sender, PointerRoutedEventArgs e)
@@ -160,6 +279,20 @@ public sealed partial class MainWindow : Window
         {
             e.Handled = true;
             ViewModel.GoToPageCommand.Execute(null);
+        }
+    }
+
+    private async void OnSearchQueryTextBoxKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Enter)
+        {
+            e.Handled = true;
+            await ViewModel.ExecuteSearchCommand.ExecuteAsync(null);
+        }
+        else if (e.Key == VirtualKey.Escape)
+        {
+            e.Handled = true;
+            ViewModel.CloseSearchBarCommand.Execute(null);
         }
     }
 
@@ -231,11 +364,17 @@ public sealed partial class MainWindow : Window
         _zoomDebounceTimer.Stop();
         _zoomDebounceTimer.Tick -= OnZoomDebounceTimerTick;
 
+        PagesListView.RemoveHandler(UIElement.PointerPressedEvent, _panPointerPressedHandler);
+        PagesListView.RemoveHandler(UIElement.PointerMovedEvent, _panPointerMovedHandler);
+        PagesListView.RemoveHandler(UIElement.PointerReleasedEvent, _panPointerReleasedHandler);
+        PagesListView.RemoveHandler(UIElement.PointerCanceledEvent, _panPointerCanceledHandler);
+
         ViewModel.DocumentLoaded -= OnDocumentLoaded;
         ViewModel.ReadingThemeChanged -= OnReadingThemeChanged;
         ViewModel.UiThemeChanged -= OnUiThemeChanged;
         ViewModel.ZoomChanged -= OnViewModelZoomChanged;
         ViewModel.ScrollToPageRequested -= OnScrollToPageRequested;
+        ViewModel.FocusSearchBoxRequested -= OnFocusSearchBoxRequested;
 
         if (_scrollViewer is not null)
         {
@@ -249,6 +388,22 @@ public sealed partial class MainWindow : Window
 
         _viewportCoordinator.Dispose();
         await ViewModel.DisposeAsync();
+    }
+
+    private static bool IsInsideScrollBar(DependencyObject? element)
+    {
+        DependencyObject? current = element;
+        while (current is not null)
+        {
+            if (current is ScrollBar)
+            {
+                return true;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return false;
     }
 
     private static T? FindDescendant<T>(DependencyObject root)

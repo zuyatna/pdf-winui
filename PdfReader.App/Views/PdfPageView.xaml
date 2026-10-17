@@ -8,13 +8,18 @@
     mc:Ignorable="d">
 
     <Border
+        x:Name="PageBorder"
         Width="{x:Bind PageItem.DisplayWidth, Mode=OneWay, FallbackValue=612}"
         Height="{x:Bind PageItem.DisplayHeight, Mode=OneWay, FallbackValue=792}"
         HorizontalAlignment="Center"
         Background="{x:Bind PageItem.PageBackgroundBrush, Mode=OneWay}"
         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
         BorderThickness="1"
-        CornerRadius="4">
+        CornerRadius="4"
+        PointerCanceled="OnPageBorderPointerCanceled"
+        PointerMoved="OnPageBorderPointerMoved"
+        PointerPressed="OnPageBorderPointerPressed"
+        PointerReleased="OnPageBorderPointerReleased">
         <Grid>
             <TextBlock
                 HorizontalAlignment="Center"
@@ -28,6 +33,12 @@
                 VerticalAlignment="Stretch"
                 Source="{x:Bind PageItem.RenderedImage, Mode=OneWay}"
                 Stretch="Fill" />
+
+            <Canvas
+                x:Name="OverlayCanvas"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                IsHitTestVisible="False" />
         </Grid>
     </Border>
 </UserControl>
