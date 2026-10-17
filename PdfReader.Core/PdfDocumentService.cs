@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -9,6 +10,10 @@ namespace PdfReader.Core;
 
 public sealed class PdfDocumentService : IPdfDocumentService
 {
+    private const int FpdfPageObjImage = 3;
+    private const int FpdfPageObjForm = 5;
+    private const int MaxFormRecursionDepth = 8;
+
     private static int s_libraryRefCount;
 
     private readonly PdfiumWorker _worker;
@@ -138,6 +143,8 @@ public sealed class PdfDocumentService : IPdfDocumentService
                 cancellationToken.ThrowIfCancellationRequested();
 
                 using NativeResource<FpdfPageT> page = LoadPageOnWorker(_documentResource.Handle, pageIndex);
+                IReadOnlyList<PixelRect> imageBounds = CollectImageBoundsOnWorker(page.Handle, targetSize);
+
                 using NativeResource<FpdfBitmapT> bitmap = CreateBitmapOnWorker(targetSize.Width, targetSize.Height);
 
                 fpdfview.FPDFBitmapFillRect(bitmap.Handle, 0, 0, targetSize.Width, targetSize.Height, 0xFFFFFFFF);
@@ -176,7 +183,7 @@ public sealed class PdfDocumentService : IPdfDocumentService
                     }
                 }
 
-                return new RenderedPageBuffer(pageIndex, targetSize, dstStride, pixels);
+                return new RenderedPageBuffer(pageIndex, targetSize, dstStride, pixels, imageBounds);
             },
             cancellationToken);
     }
@@ -203,6 +210,75 @@ public sealed class PdfDocumentService : IPdfDocumentService
             if (_ownsWorker)
             {
                 await _worker.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    private static IReadOnlyList<PixelRect> CollectImageBoundsOnWorker(FpdfPageT page, PixelSize targetSize)
+    {
+        int objectCount = fpdf_edit.FPDFPageCountObjects(page);
+        if (objectCount <= 0)
+        {
+            return Array.Empty<PixelRect>();
+        }
+
+        var bounds = new List<PixelRect>();
+        for (int i = 0; i < objectCount; i++)
+        {
+            FpdfPageobjectT? pageObj = fpdf_edit.FPDFPageGetObject(page, i);
+            CollectPageObjectImageBoundsOnWorker(page, pageObj, targetSize, bounds, depth: 0);
+        }
+
+        return bounds.Count == 0 ? Array.Empty<PixelRect>() : bounds.AsReadOnly();
+    }
+
+    private static void CollectPageObjectImageBoundsOnWorker(
+        FpdfPageT page,
+        FpdfPageobjectT? pageObj,
+        PixelSize targetSize,
+        List<PixelRect> bounds,
+        int depth)
+    {
+        if (pageObj is null || pageObj.__Instance == IntPtr.Zero || depth > MaxFormRecursionDepth)
+        {
+            return;
+        }
+
+        int objType = fpdf_edit.FPDFPageObjGetType(pageObj);
+        if (objType == FpdfPageObjImage)
+        {
+            float left = 0;
+            float bottom = 0;
+            float right = 0;
+            float top = 0;
+            if (fpdf_edit.FPDFPageObjGetBounds(pageObj, ref left, ref bottom, ref right, ref top) != 0)
+            {
+                int x1 = 0;
+                int y1 = 0;
+                int x2 = 0;
+                int y2 = 0;
+                fpdfview.FPDF_PageToDevice(page, 0, 0, targetSize.Width, targetSize.Height, 0, left, top, ref x1, ref y1);
+                fpdfview.FPDF_PageToDevice(page, 0, 0, targetSize.Width, targetSize.Height, 0, right, bottom, ref x2, ref y2);
+
+                int minX = Math.Min(x1, x2);
+                int maxX = Math.Max(x1, x2);
+                int minY = Math.Min(y1, y2);
+                int maxY = Math.Max(y1, y2);
+
+                PixelRect rect = new PixelRect(minX, minY, maxX - minX, maxY - minY).Clamp(targetSize);
+                if (!rect.IsEmpty)
+                {
+                    bounds.Add(rect);
+                }
+            }
+        }
+        else if (objType == FpdfPageObjForm)
+        {
+            int childCount = fpdf_edit.FPDFFormObjCountObjects(pageObj);
+            for (int i = 0; i < childCount; i++)
+            {
+                FpdfPageobjectT? childObj = fpdf_edit.FPDFFormObjGetObject(pageObj, (ulong)i);
+                CollectPageObjectImageBoundsOnWorker(page, childObj, targetSize, bounds, depth + 1);
             }
         }
     }

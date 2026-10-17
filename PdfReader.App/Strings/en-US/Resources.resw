@@ -67,6 +67,93 @@
   <data name="OpenPdfButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
     <value>Open a PDF document</value>
   </data>
+  <data name="PrevPageButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Previous page</value>
+  </data>
+  <data name="NextPageButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Next page</value>
+  </data>
+  <data name="GoToPageBox.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Enter page number and press Enter</value>
+  </data>
+  <data name="ZoomOutButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Zoom out (Ctrl + Mouse Wheel Down)</value>
+  </data>
+  <data name="ZoomResetButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Reset zoom to 100%</value>
+  </data>
+  <data name="ZoomInButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Zoom in (Ctrl + Mouse Wheel Up)</value>
+  </data>
+  <data name="FitWidthButton.Content" xml:space="preserve">
+    <value>Fit Width</value>
+  </data>
+  <data name="FitWidthButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Fit page width to window</value>
+  </data>
+  <data name="FitPageButton.Content" xml:space="preserve">
+    <value>Fit Page</value>
+  </data>
+  <data name="FitPageButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Fit entire page in window</value>
+  </data>
+  <data name="DarkReadingToggleButtonText.Text" xml:space="preserve">
+    <value>Dark Reading</value>
+  </data>
+  <data name="DarkReadingToggleButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Toggle comfortable dark reading mode</value>
+  </data>
+  <data name="SettingsButtonText.Text" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="SettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Open theme and reading appearance settings</value>
+  </data>
+  <data name="SettingsPaneHeader.Text" xml:space="preserve">
+    <value>Appearance &amp; Reading Theme</value>
+  </data>
+  <data name="UiThemeComboBox.Header" xml:space="preserve">
+    <value>App UI theme (Layer 1)</value>
+  </data>
+  <data name="UiThemeSystemItem.Content" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="UiThemeLightItem.Content" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="UiThemeDarkItem.Content" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="ReadingThemeComboBox.Header" xml:space="preserve">
+    <value>Page reading theme (Layer 2)</value>
+  </data>
+  <data name="ReadingThemeOriginalItem.Content" xml:space="preserve">
+    <value>Original (Unchanged)</value>
+  </data>
+  <data name="ReadingThemeDarkItem.Content" xml:space="preserve">
+    <value>Dark (Warm Palette)</value>
+  </data>
+  <data name="PaletteSectionHeader.Text" xml:space="preserve">
+    <value>Dark Reading Palette (#RRGGBB)</value>
+  </data>
+  <data name="PageBackgroundHexBox.Header" xml:space="preserve">
+    <value>Page background (paper)</value>
+  </data>
+  <data name="TextColorHexBox.Header" xml:space="preserve">
+    <value>Text color (ink)</value>
+  </data>
+  <data name="CanvasColorHexBox.Header" xml:space="preserve">
+    <value>Canvas background (around pages)</value>
+  </data>
+  <data name="ImageDimSlider.Header" xml:space="preserve">
+    <value>Image dimming in dark mode (%)</value>
+  </data>
+  <data name="ApplyPaletteButton.Content" xml:space="preserve">
+    <value>Apply Colors</value>
+  </data>
+  <data name="ResetPaletteButton.Content" xml:space="preserve">
+    <value>Reset Defaults</value>
+  </data>
   <data name="EmptyStateTitle.Text" xml:space="preserve">
     <value>Open a PDF to start reading</value>
   </data>
@@ -75,6 +162,12 @@
   </data>
   <data name="EmptyStateOpenButton.Content" xml:space="preserve">
     <value>Open PDF...</value>
+  </data>
+  <data name="RecentFilesHeader.Text" xml:space="preserve">
+    <value>Recent Files</value>
+  </data>
+  <data name="ClearRecentButton.Content" xml:space="preserve">
+    <value>Clear</value>
   </data>
   <data name="StatusReady" xml:space="preserve">
     <value>Ready</value>
@@ -87,6 +180,9 @@
   </data>
   <data name="StatusOpenFailedFormat" xml:space="preserve">
     <value>Could not open PDF: {0}</value>
+  </data>
+  <data name="StatusInvalidColorHex" xml:space="preserve">
+    <value>Invalid color hex format. Please use #RRGGBB (for example #262624).</value>
   </data>
   <data name="ErrorInfoBar.Title" xml:space="preserve">
     <value>Error</value>

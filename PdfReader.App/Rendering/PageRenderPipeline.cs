@@ -9,10 +9,16 @@ public sealed class PageRenderPipeline : IDisposable
 {
     private const long DefaultMaxCacheBytes = 128L * 1024 * 1024;
 
-    private readonly record struct PageCacheKey(int PageIndex, int Width, int Height);
+    private readonly record struct PageCacheKey(
+        int PageIndex,
+        int Width,
+        int Height,
+        ReadingThemePalette Theme);
 
+    private readonly object _themeGate = new();
     private readonly IPdfDocumentService _documentService;
     private readonly LruCache<PageCacheKey, PageFrame> _cache;
+    private ReadingThemePalette _readingTheme = ReadingThemePalette.DefaultDark;
     private bool _disposed;
 
     public PageRenderPipeline(IPdfDocumentService documentService, long maxCacheBytes = DefaultMaxCacheBytes)
@@ -25,6 +31,36 @@ public sealed class PageRenderPipeline : IDisposable
 
     public long CachedBytes => _cache.CurrentBytes;
 
+    public ReadingThemePalette ReadingTheme
+    {
+        get
+        {
+            lock (_themeGate)
+            {
+                return _readingTheme;
+            }
+        }
+    }
+
+    public bool SetReadingTheme(ReadingThemePalette palette)
+    {
+        ArgumentNullException.ThrowIfNull(palette);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        lock (_themeGate)
+        {
+            if (_readingTheme == palette)
+            {
+                return false;
+            }
+
+            _readingTheme = palette;
+        }
+
+        _cache.Clear();
+        return true;
+    }
+
     public async Task<PageFrame> RenderPageAsync(
         int pageIndex,
         PdfPageSize pageSize,
@@ -33,8 +69,9 @@ public sealed class PageRenderPipeline : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        ReadingThemePalette activeTheme = ReadingTheme;
         PixelSize targetSize = PixelSize.FromPageSize(pageSize, scale);
-        var key = new PageCacheKey(pageIndex, targetSize.Width, targetSize.Height);
+        var key = new PageCacheKey(pageIndex, targetSize.Width, targetSize.Height, activeTheme);
 
         if (_cache.TryGetValue(key, out PageFrame? cachedFrame) && !cachedFrame.IsDisposed)
         {
@@ -45,7 +82,10 @@ public sealed class PageRenderPipeline : IDisposable
             .RenderPageAsync(pageIndex, targetSize, cancellationToken)
             .ConfigureAwait(false);
 
-        var frame = new PageFrame(rendered.PageIndex, rendered.Size, rendered.Stride, rendered.BgraPixels);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        byte[] themedPixels = PageThemeProcessor.ApplyTheme(rendered, activeTheme);
+        var frame = new PageFrame(rendered.PageIndex, rendered.Size, rendered.Stride, themedPixels);
         _cache.Set(key, frame, frame.ByteSize);
         return frame;
     }

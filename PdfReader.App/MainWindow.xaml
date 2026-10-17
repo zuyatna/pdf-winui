@@ -15,119 +15,405 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid
-        x:Name="RootGrid"
-        Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <Page
+        x:Name="RootPage"
+        Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+        RequestedTheme="{x:Bind ViewModel.RootRequestedTheme, Mode=OneWay}">
+        <Grid x:Name="RootGrid">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-        <Border
-            Grid.Row="0"
-            Padding="16,10"
-            Background="{ThemeResource LayerFillColorDefaultBrush}"
-            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-            BorderThickness="0,0,0,1">
-            <Grid ColumnSpacing="12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+            <Border
+                Grid.Row="0"
+                Padding="16,10"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                <Button
-                    x:Uid="OpenPdfButton"
-                    Grid.Column="0"
-                    Command="{x:Bind ViewModel.OpenDocumentCommand}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <SymbolIcon Symbol="OpenFile" />
-                        <TextBlock x:Uid="OpenPdfButtonText" Text="Open PDF" />
+                    <Button
+                        x:Uid="OpenPdfButton"
+                        Grid.Column="0"
+                        Command="{x:Bind ViewModel.OpenDocumentCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <SymbolIcon Symbol="OpenFile" />
+                            <TextBlock x:Uid="OpenPdfButtonText" Text="Open PDF" />
+                        </StackPanel>
+                    </Button>
+
+                    <TextBlock
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Opacity="0.75"
+                        Style="{ThemeResource CaptionTextBlockStyle}"
+                        Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis" />
+
+                    <ProgressRing
+                        Grid.Column="2"
+                        Width="18"
+                        Height="18"
+                        IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+
+                    <StackPanel
+                        Grid.Column="3"
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        Visibility="{x:Bind ViewModel.DocumentVisibility, Mode=OneWay}">
+                        <Button
+                            x:Uid="PrevPageButton"
+                            Command="{x:Bind ViewModel.PreviousPageCommand}"
+                            Padding="8,6">
+                            <FontIcon FontSize="12" Glyph="&#xE76B;" />
+                        </Button>
+                        <TextBox
+                            x:Uid="GoToPageBox"
+                            x:Name="GoToPageTextBox"
+                            Width="56"
+                            VerticalAlignment="Center"
+                            KeyDown="OnGoToPageTextBoxKeyDown"
+                            Text="{x:Bind ViewModel.GoToPageInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            TextAlignment="Center" />
+                        <TextBlock
+                            Margin="4,0"
+                            VerticalAlignment="Center"
+                            Opacity="0.8"
+                            Text="{x:Bind ViewModel.TotalPagesSuffixText, Mode=OneWay}" />
+                        <Button
+                            x:Uid="NextPageButton"
+                            Command="{x:Bind ViewModel.NextPageCommand}"
+                            Padding="8,6">
+                            <FontIcon FontSize="12" Glyph="&#xE76C;" />
+                        </Button>
                     </StackPanel>
-                </Button>
 
-                <TextBlock
-                    Grid.Column="1"
-                    VerticalAlignment="Center"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Style="{ThemeResource CaptionTextBlockStyle}"
-                    Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                    TextTrimming="CharacterEllipsis" />
+                    <StackPanel
+                        Grid.Column="4"
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        Visibility="{x:Bind ViewModel.DocumentVisibility, Mode=OneWay}">
+                        <Button
+                            x:Uid="ZoomOutButton"
+                            Command="{x:Bind ViewModel.ZoomOutCommand}"
+                            Padding="8,6">
+                            <FontIcon FontSize="12" Glyph="&#xE71F;" />
+                        </Button>
+                        <Button
+                            x:Uid="ZoomResetButton"
+                            MinWidth="62"
+                            Command="{x:Bind ViewModel.ResetZoomCommand}"
+                            Content="{x:Bind ViewModel.ZoomPercentageText, Mode=OneWay}" />
+                        <Button
+                            x:Uid="ZoomInButton"
+                            Command="{x:Bind ViewModel.ZoomInCommand}"
+                            Padding="8,6">
+                            <FontIcon FontSize="12" Glyph="&#xE8A3;" />
+                        </Button>
+                        <ToggleButton
+                            x:Uid="FitWidthButton"
+                            Command="{x:Bind ViewModel.SetFitWidthCommand}"
+                            Content="Fit Width"
+                            IsChecked="{x:Bind ViewModel.IsFitWidthActive, Mode=OneWay}" />
+                        <ToggleButton
+                            x:Uid="FitPageButton"
+                            Command="{x:Bind ViewModel.SetFitPageCommand}"
+                            Content="Fit Page"
+                            IsChecked="{x:Bind ViewModel.IsFitPageActive, Mode=OneWay}" />
+                    </StackPanel>
 
-                <ProgressRing
-                    Grid.Column="2"
-                    Width="18"
-                    Height="18"
-                    IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
-            </Grid>
-        </Border>
+                    <ToggleButton
+                        x:Uid="DarkReadingToggleButton"
+                        Grid.Column="5"
+                        IsChecked="{x:Bind ViewModel.IsDarkReadingMode, Mode=TwoWay}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontSize="14" Glyph="&#xE708;" />
+                            <TextBlock x:Uid="DarkReadingToggleButtonText" Text="Dark Reading" />
+                        </StackPanel>
+                    </ToggleButton>
 
-        <InfoBar
-            x:Uid="ErrorInfoBar"
-            Grid.Row="1"
-            Title="Error"
-            IsClosable="True"
-            IsOpen="{x:Bind ViewModel.IsErrorOpen, Mode=TwoWay}"
-            Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
-            Severity="Error" />
+                    <Button
+                        x:Uid="SettingsButton"
+                        Grid.Column="6"
+                        Command="{x:Bind ViewModel.ToggleSettingsPaneCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <SymbolIcon Symbol="Setting" />
+                            <TextBlock x:Uid="SettingsButtonText" Text="Appearance" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
 
-        <StackPanel
-            Grid.Row="2"
-            MaxWidth="420"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            Spacing="12"
-            Visibility="{x:Bind ViewModel.EmptyStateVisibility, Mode=OneWay}">
-            <TextBlock
-                x:Uid="EmptyStateTitle"
-                HorizontalAlignment="Center"
-                Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                Style="{ThemeResource SubtitleTextBlockStyle}"
-                Text="Open a PDF to start reading"
-                TextAlignment="Center" />
-            <TextBlock
-                x:Uid="EmptyStateSubtitle"
-                HorizontalAlignment="Center"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Style="{ThemeResource BodyTextBlockStyle}"
-                Text="Select a PDF file from your device for fast, virtualized reading."
-                TextAlignment="Center"
-                TextWrapping="WrapWholeWords" />
-            <Button
-                x:Uid="EmptyStateOpenButton"
-                HorizontalAlignment="Center"
-                Command="{x:Bind ViewModel.OpenDocumentCommand}"
-                Content="Open PDF..."
-                Style="{ThemeResource AccentButtonStyle}" />
-        </StackPanel>
+            <InfoBar
+                x:Uid="ErrorInfoBar"
+                Grid.Row="1"
+                Title="Error"
+                IsClosable="True"
+                IsOpen="{x:Bind ViewModel.IsErrorOpen, Mode=TwoWay}"
+                Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                Severity="Error" />
 
-        <ListView
-            x:Name="PagesListView"
-            Grid.Row="2"
-            Padding="0,16"
-            HorizontalContentAlignment="Center"
-            IsItemClickEnabled="False"
-            ItemsSource="{x:Bind ViewModel.Pages, Mode=OneWay}"
-            SelectionMode="None"
-            Visibility="{x:Bind ViewModel.DocumentVisibility, Mode=OneWay}">
-            <ListView.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <ItemsStackPanel CacheLength="2.0" Orientation="Vertical" />
-                </ItemsPanelTemplate>
-            </ListView.ItemsPanel>
-            <ListView.ItemContainerStyle>
-                <Style TargetType="ListViewItem">
-                    <Setter Property="HorizontalContentAlignment" Value="Center" />
-                    <Setter Property="Padding" Value="0" />
-                    <Setter Property="Margin" Value="0,0,0,16" />
-                </Style>
-            </ListView.ItemContainerStyle>
-            <ListView.ItemTemplate>
-                <DataTemplate x:DataType="vm:PdfPageItem">
-                    <views:PdfPageView PageItem="{x:Bind}" />
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
-    </Grid>
+            <SplitView
+                Grid.Row="2"
+                DisplayMode="Inline"
+                IsPaneOpen="{x:Bind ViewModel.IsSettingsPaneOpen, Mode=TwoWay}"
+                OpenPaneLength="340"
+                PaneBackground="{ThemeResource LayerFillColorDefaultBrush}"
+                PanePlacement="Right">
+                <SplitView.Pane>
+                    <ScrollViewer Padding="20,16">
+                        <StackPanel Spacing="16">
+                            <TextBlock
+                                x:Uid="SettingsPaneHeader"
+                                Style="{ThemeResource SubtitleTextBlockStyle}"
+                                Text="Appearance &amp; Reading Theme" />
+
+                            <ComboBox
+                                x:Uid="UiThemeComboBox"
+                                HorizontalAlignment="Stretch"
+                                Header="App UI theme (Layer 1)"
+                                SelectedIndex="{x:Bind ViewModel.SelectedUiThemeIndex, Mode=TwoWay}">
+                                <ComboBoxItem x:Uid="UiThemeSystemItem" Content="System" />
+                                <ComboBoxItem x:Uid="UiThemeLightItem" Content="Light" />
+                                <ComboBoxItem x:Uid="UiThemeDarkItem" Content="Dark" />
+                            </ComboBox>
+
+                            <ComboBox
+                                x:Uid="ReadingThemeComboBox"
+                                HorizontalAlignment="Stretch"
+                                Header="Page reading theme (Layer 2)"
+                                SelectedIndex="{x:Bind ViewModel.SelectedReadingThemeIndex, Mode=TwoWay}">
+                                <ComboBoxItem x:Uid="ReadingThemeOriginalItem" Content="Original (Unchanged)" />
+                                <ComboBoxItem x:Uid="ReadingThemeDarkItem" Content="Dark (Warm Palette)" />
+                            </ComboBox>
+
+                            <Border
+                                Height="1"
+                                Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                            <TextBlock
+                                x:Uid="PaletteSectionHeader"
+                                Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                Text="Dark Reading Palette (#RRGGBB)" />
+
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="36" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox
+                                    x:Uid="PageBackgroundHexBox"
+                                    Grid.Column="0"
+                                    Header="Page background (paper)"
+                                    Text="{x:Bind ViewModel.DarkPageBackgroundHex, Mode=TwoWay}" />
+                                <Border
+                                    Grid.Column="1"
+                                    Height="32"
+                                    VerticalAlignment="Bottom"
+                                    Background="{x:Bind ViewModel.SwatchPageBackgroundBrush, Mode=OneWay}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4" />
+                            </Grid>
+
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="36" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox
+                                    x:Uid="TextColorHexBox"
+                                    Grid.Column="0"
+                                    Header="Text color (ink)"
+                                    Text="{x:Bind ViewModel.DarkTextHex, Mode=TwoWay}" />
+                                <Border
+                                    Grid.Column="1"
+                                    Height="32"
+                                    VerticalAlignment="Bottom"
+                                    Background="{x:Bind ViewModel.SwatchTextBrush, Mode=OneWay}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4" />
+                            </Grid>
+
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="36" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox
+                                    x:Uid="CanvasColorHexBox"
+                                    Grid.Column="0"
+                                    Header="Canvas background (around pages)"
+                                    Text="{x:Bind ViewModel.DarkCanvasHex, Mode=TwoWay}" />
+                                <Border
+                                    Grid.Column="1"
+                                    Height="32"
+                                    VerticalAlignment="Bottom"
+                                    Background="{x:Bind ViewModel.SwatchCanvasBrush, Mode=OneWay}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4" />
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button
+                                    x:Uid="ApplyPaletteButton"
+                                    Command="{x:Bind ViewModel.ApplyPaletteCommand}"
+                                    Content="Apply Colors"
+                                    Style="{ThemeResource AccentButtonStyle}" />
+                                <Button
+                                    x:Uid="ResetPaletteButton"
+                                    Command="{x:Bind ViewModel.ResetPaletteDefaultsCommand}"
+                                    Content="Reset Defaults" />
+                            </StackPanel>
+
+                            <Slider
+                                x:Uid="ImageDimSlider"
+                                Header="Image dimming in dark mode (%)"
+                                Maximum="50"
+                                Minimum="0"
+                                StepFrequency="5"
+                                TickFrequency="10"
+                                Value="{x:Bind ViewModel.ImageDimPercentage, Mode=TwoWay}" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </SplitView.Pane>
+
+                <SplitView.Content>
+                    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+                        <ScrollViewer
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Center"
+                            Visibility="{x:Bind ViewModel.EmptyStateVisibility, Mode=OneWay}">
+                            <StackPanel
+                                MaxWidth="520"
+                                Padding="24"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Spacing="16">
+                                <TextBlock
+                                    x:Uid="EmptyStateTitle"
+                                    HorizontalAlignment="Center"
+                                    FontSize="20"
+                                    FontWeight="SemiBold"
+                                    Text="Open a PDF to start reading"
+                                    TextAlignment="Center" />
+                                <TextBlock
+                                    x:Uid="EmptyStateSubtitle"
+                                    HorizontalAlignment="Center"
+                                    Opacity="0.75"
+                                    Text="Select a PDF file from your device for fast, virtualized reading."
+                                    TextAlignment="Center"
+                                    TextWrapping="WrapWholeWords" />
+                                <Button
+                                    x:Uid="EmptyStateOpenButton"
+                                    HorizontalAlignment="Center"
+                                    Command="{x:Bind ViewModel.OpenDocumentCommand}"
+                                    Content="Open PDF..."
+                                    Style="{ThemeResource AccentButtonStyle}" />
+
+                                <StackPanel
+                                    Margin="0,12,0,0"
+                                    Spacing="8"
+                                    Visibility="{x:Bind ViewModel.RecentFilesVisibility, Mode=OneWay}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            x:Uid="RecentFilesHeader"
+                                            Grid.Column="0"
+                                            VerticalAlignment="Center"
+                                            FontWeight="SemiBold"
+                                            Text="Recent Files" />
+                                        <Button
+                                            x:Uid="ClearRecentButton"
+                                            Grid.Column="1"
+                                            Command="{x:Bind ViewModel.ClearRecentFilesCommand}"
+                                            Content="Clear" />
+                                    </Grid>
+
+                                    <ListView
+                                        IsItemClickEnabled="True"
+                                        ItemClick="OnRecentFileItemClick"
+                                        ItemsSource="{x:Bind ViewModel.RecentFiles, Mode=OneWay}"
+                                        SelectionMode="None">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:RecentFileItem">
+                                                <Grid Padding="8,10" ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="2">
+                                                        <TextBlock
+                                                            FontWeight="SemiBold"
+                                                            Text="{x:Bind FileName}"
+                                                            TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock
+                                                            FontSize="12"
+                                                            Opacity="0.65"
+                                                            Text="{x:Bind DirectoryPath}"
+                                                            TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <TextBlock
+                                                        Grid.Column="1"
+                                                        VerticalAlignment="Center"
+                                                        FontSize="12"
+                                                        Opacity="0.75"
+                                                        Text="{x:Bind SummaryText}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <ListView
+                            x:Name="PagesListView"
+                            Padding="0,16"
+                            HorizontalContentAlignment="Center"
+                            Background="{x:Bind ViewModel.CanvasBackgroundBrush, Mode=OneWay}"
+                            IsItemClickEnabled="False"
+                            ItemsSource="{x:Bind ViewModel.Pages, Mode=OneWay}"
+                            PointerWheelChanged="OnPagesListViewPointerWheelChanged"
+                            SelectionMode="None"
+                            Visibility="{x:Bind ViewModel.DocumentVisibility, Mode=OneWay}">
+                            <ListView.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <ItemsStackPanel CacheLength="2.0" Orientation="Vertical" />
+                                </ItemsPanelTemplate>
+                            </ListView.ItemsPanel>
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Center" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0,0,0,16" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PdfPageItem">
+                                    <views:PdfPageView PageItem="{x:Bind}" />
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+                </SplitView.Content>
+            </SplitView>
+        </Grid>
+    </Page>
 </Window>

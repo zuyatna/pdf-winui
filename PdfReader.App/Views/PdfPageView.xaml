@@ -11,7 +11,7 @@
         Width="{x:Bind PageItem.DisplayWidth, Mode=OneWay, FallbackValue=612}"
         Height="{x:Bind PageItem.DisplayHeight, Mode=OneWay, FallbackValue=792}"
         HorizontalAlignment="Center"
-        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+        Background="{x:Bind PageItem.PageBackgroundBrush, Mode=OneWay}"
         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
         BorderThickness="1"
         CornerRadius="4">

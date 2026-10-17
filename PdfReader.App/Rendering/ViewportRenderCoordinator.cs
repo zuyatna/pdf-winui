@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Media;
 using PdfReader.App.ViewModels;
+using PdfReader.Core;
 
 namespace PdfReader.App.Rendering;
 
@@ -40,6 +41,28 @@ public sealed class ViewportRenderCoordinator : IDisposable
 
     public double RasterizationScale => _rasterizationScale;
 
+    public static double CalculatePageVerticalOffset(
+        IReadOnlyList<PdfPageItem> pages,
+        int targetPageIndex,
+        double itemSpacing = 16.0)
+    {
+        ArgumentNullException.ThrowIfNull(pages);
+
+        if (pages.Count == 0 || targetPageIndex <= 0)
+        {
+            return 0.0;
+        }
+
+        int clampedIndex = Math.Clamp(targetPageIndex, 0, pages.Count - 1);
+        double offset = 0.0;
+        for (int i = 0; i < clampedIndex; i++)
+        {
+            offset += pages[i].DisplayHeight + itemSpacing;
+        }
+
+        return offset;
+    }
+
     public void SetRasterizationScale(double rasterizationScale)
     {
         if (rasterizationScale <= 0 || !double.IsFinite(rasterizationScale))
@@ -50,33 +73,47 @@ public sealed class ViewportRenderCoordinator : IDisposable
         _rasterizationScale = rasterizationScale;
     }
 
-    public void UpdateViewport(
+    public int UpdateViewport(
         IReadOnlyList<PdfPageItem> pages,
         double verticalOffset,
         double viewportHeight,
-        double itemSpacing = 16.0)
+        double itemSpacing = 16.0,
+        bool triggerRenders = true)
     {
         ArgumentNullException.ThrowIfNull(pages);
 
         if (_disposed || pages.Count == 0 || viewportHeight <= 0)
         {
             CancelAll();
-            return;
+            return 0;
         }
 
-        (int firstVisible, int lastVisible) = ComputeVisibleRange(pages, verticalOffset, viewportHeight, itemSpacing);
+        (int firstVisible, int lastVisible, int primaryVisible) = ComputeVisibleRange(
+            pages,
+            verticalOffset,
+            viewportHeight,
+            itemSpacing);
+
+        if (!triggerRenders)
+        {
+            return primaryVisible;
+        }
+
         int startIndex = Math.Max(0, firstVisible - _bufferPages);
         int endIndex = Math.Min(pages.Count - 1, lastVisible + _bufferPages);
 
         CancelOutOfRange(startIndex, endIndex);
         ReleaseDistantPageImages(pages, startIndex, endIndex);
 
+        ReadingThemePalette activeTheme = _pipeline.ReadingTheme;
         for (int i = startIndex; i <= endIndex; i++)
         {
             PdfPageItem page = pages[i];
             double targetScale = _rasterizationScale * page.Zoom;
-            EnsurePageRendered(page, targetScale);
+            EnsurePageRendered(page, targetScale, activeTheme);
         }
+
+        return primaryVisible;
     }
 
     public void CancelAll()
@@ -100,7 +137,7 @@ public sealed class ViewportRenderCoordinator : IDisposable
         CancelAll();
     }
 
-    private static (int FirstVisible, int LastVisible) ComputeVisibleRange(
+    private static (int FirstVisible, int LastVisible, int PrimaryVisible) ComputeVisibleRange(
         IReadOnlyList<PdfPageItem> pages,
         double verticalOffset,
         double viewportHeight,
@@ -108,9 +145,11 @@ public sealed class ViewportRenderCoordinator : IDisposable
     {
         double viewportTop = Math.Max(0, verticalOffset);
         double viewportBottom = viewportTop + Math.Max(1, viewportHeight);
+        double focalY = viewportTop + (Math.Max(1, viewportHeight) * 0.35);
 
         int firstVisible = -1;
         int lastVisible = -1;
+        int primaryVisible = -1;
         double currentTop = 0;
 
         for (int i = 0; i < pages.Count; i++)
@@ -121,6 +160,11 @@ public sealed class ViewportRenderCoordinator : IDisposable
             if (currentBottom >= viewportTop && firstVisible == -1)
             {
                 firstVisible = i;
+            }
+
+            if (primaryVisible == -1 && currentBottom >= focalY)
+            {
+                primaryVisible = i;
             }
 
             if (currentTop <= viewportBottom)
@@ -145,7 +189,12 @@ public sealed class ViewportRenderCoordinator : IDisposable
             lastVisible = firstVisible;
         }
 
-        return (firstVisible, lastVisible);
+        if (primaryVisible == -1)
+        {
+            primaryVisible = firstVisible;
+        }
+
+        return (firstVisible, lastVisible, primaryVisible);
     }
 
     private void CancelOutOfRange(int startIndex, int endIndex)
@@ -180,6 +229,7 @@ public sealed class ViewportRenderCoordinator : IDisposable
             {
                 pages[i].RenderedImage = null;
                 pages[i].RenderedScale = 0;
+                pages[i].RenderedTheme = null;
             }
         }
 
@@ -189,13 +239,16 @@ public sealed class ViewportRenderCoordinator : IDisposable
             {
                 pages[i].RenderedImage = null;
                 pages[i].RenderedScale = 0;
+                pages[i].RenderedTheme = null;
             }
         }
     }
 
-    private void EnsurePageRendered(PdfPageItem page, double targetScale)
+    private void EnsurePageRendered(PdfPageItem page, double targetScale, ReadingThemePalette activeTheme)
     {
-        if (page.RenderedImage is not null && Math.Abs(page.RenderedScale - targetScale) <= ScaleTolerance)
+        if (page.RenderedImage is not null &&
+            Math.Abs(page.RenderedScale - targetScale) <= ScaleTolerance &&
+            page.RenderedTheme == activeTheme)
         {
             return;
         }
@@ -207,12 +260,13 @@ public sealed class ViewportRenderCoordinator : IDisposable
 
         var cts = new CancellationTokenSource();
         _activeRenders[page.PageIndex] = cts;
-        _ = RenderPageCoreAsync(page, targetScale, cts);
+        _ = RenderPageCoreAsync(page, targetScale, activeTheme, cts);
     }
 
     private async Task RenderPageCoreAsync(
         PdfPageItem page,
         double targetScale,
+        ReadingThemePalette activeTheme,
         CancellationTokenSource cts)
     {
         CancellationToken token = cts.Token;
@@ -238,11 +292,16 @@ public sealed class ViewportRenderCoordinator : IDisposable
                 ImageSource imageSource = frame.CreateImageSource();
                 page.RenderedImage = imageSource;
                 page.RenderedScale = targetScale;
+                page.RenderedTheme = activeTheme;
             });
         }
         catch (OperationCanceledException)
         {
-            // Expected when a page scrolls out of the active viewport window.
+            // Expected when a page scrolls out of the active viewport window or theme changes.
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to render page {page.PageIndex}: {ex.Message}");
         }
         finally
         {
