@@ -203,6 +203,10 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     public bool IsReadingInteractionMode => !IsTextSelectionMode;
 
+    public string InteractionModeText => IsTextSelectionMode
+        ? GetString("InteractionModeSelectText", "Select Text")
+        : GetString("InteractionModeReading", "Reading");
+
     public string DragDropOpenCaption => GetString("DragDropOpenCaption", "Open PDF");
 
     [RelayCommand]
@@ -791,6 +795,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     partial void OnIsTextSelectionModeChanged(bool value)
     {
         OnPropertyChanged(nameof(IsReadingInteractionMode));
+        OnPropertyChanged(nameof(InteractionModeText));
         foreach (PdfPageItem page in Pages)
         {
             page.IsTextSelectionMode = value;

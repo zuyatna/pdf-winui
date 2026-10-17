@@ -62,6 +62,10 @@
                                 <TextBlock x:Uid="OpenPdfButtonText" Text="Open PDF" />
                             </StackPanel>
                         </Button>
+                        <ToggleButton x:Name="InteractionModeButton" x:Uid="InteractionModeButton"
+                            MinWidth="100" IsEnabled="{x:Bind ViewModel.HasDocument, Mode=OneWay}"
+                            Content="{x:Bind ViewModel.InteractionModeText, Mode=OneWay}"
+                            IsChecked="{x:Bind ViewModel.IsTextSelectionMode, Mode=TwoWay}" />
                     </StackPanel>
                     <Grid Grid.Column="1" ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
@@ -111,9 +115,6 @@
                         <FontIcon Glyph="&#xE712;" FontSize="16" />
                         <Button.Flyout>
                             <MenuFlyout>
-                                <ToggleMenuFlyoutItem x:Uid="TextSelectionMenuItem"
-                                    IsEnabled="{x:Bind ViewModel.HasDocument, Mode=OneWay}"
-                                    IsChecked="{x:Bind ViewModel.IsTextSelectionMode, Mode=TwoWay}" />
                                 <MenuFlyoutItem x:Uid="CopyMenuItem" Command="{x:Bind ViewModel.CopySelectedTextCommand}"
                                     IsEnabled="{x:Bind ViewModel.HasTextSelection, Mode=OneWay}">
                                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C8;" /></MenuFlyoutItem.Icon>
@@ -124,7 +125,9 @@
                                 </MenuFlyoutItem>
                                 <MenuFlyoutSeparator />
                                 <ToggleMenuFlyoutItem x:Uid="DarkReadingMenuItem"
-                                    IsChecked="{x:Bind ViewModel.IsDarkReadingMode, Mode=TwoWay}" />
+                                    IsChecked="{x:Bind ViewModel.IsDarkReadingMode, Mode=TwoWay}">
+                                    <ToggleMenuFlyoutItem.Icon><FontIcon Glyph="&#xE708;" /></ToggleMenuFlyoutItem.Icon>
+                                </ToggleMenuFlyoutItem>
                                 <MenuFlyoutItem x:Uid="AppearanceMenuItem" Command="{x:Bind ViewModel.ToggleSettingsPaneCommand}">
                                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE713;" /></MenuFlyoutItem.Icon>
                                 </MenuFlyoutItem>

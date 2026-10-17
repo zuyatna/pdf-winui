@@ -258,7 +258,9 @@
   <data name="BookmarkSaveFailed" xml:space="preserve"><value>Could not save bookmarks. Check access to your local settings folder and try again.</value></data>
   <data name="AdvancedMenuButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Advanced</value></data>
   <data name="AdvancedMenuButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Advanced</value></data>
-  <data name="TextSelectionMenuItem.Text" xml:space="preserve"><value>Text selection</value></data>
+  <data name="InteractionModeReading" xml:space="preserve"><value>Reading</value></data>
+  <data name="InteractionModeSelectText" xml:space="preserve"><value>Select Text</value></data>
+  <data name="InteractionModeButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Switch between reading and text selection</value></data>
   <data name="CopyMenuItem.Text" xml:space="preserve"><value>Copy selected text</value></data>
   <data name="CopyMenuItem.KeyboardAcceleratorTextOverride" xml:space="preserve"><value>Ctrl+C</value></data>
   <data name="FindMenuItem.Text" xml:space="preserve"><value>Find in document</value></data>

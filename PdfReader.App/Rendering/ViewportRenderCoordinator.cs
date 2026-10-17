@@ -12,7 +12,6 @@ namespace PdfReader.App.Rendering;
 public sealed class ViewportRenderCoordinator : IDisposable
 {
     private const double ScaleTolerance = 0.001;
-    private const int DetachImageDistancePages = 8;
 
     private readonly PageRenderPipeline _pipeline;
     private readonly DispatcherQueue _dispatcherQueue;
@@ -241,10 +240,7 @@ public sealed class ViewportRenderCoordinator : IDisposable
         int startIndex,
         int endIndex)
     {
-        int retainStart = Math.Max(0, startIndex - DetachImageDistancePages);
-        int retainEnd = Math.Min(pages.Count - 1, endIndex + DetachImageDistancePages);
-
-        for (int i = 0; i < retainStart; i++)
+        for (int i = 0; i < startIndex; i++)
         {
             if (pages[i].RenderedImage is not null)
             {
@@ -254,7 +250,7 @@ public sealed class ViewportRenderCoordinator : IDisposable
             }
         }
 
-        for (int i = retainEnd + 1; i < pages.Count; i++)
+        for (int i = endIndex + 1; i < pages.Count; i++)
         {
             if (pages[i].RenderedImage is not null)
             {
@@ -310,7 +306,11 @@ public sealed class ViewportRenderCoordinator : IDisposable
                     return;
                 }
 
-                ImageSource imageSource = frame.CreateImageSource();
+                if (!frame.TryCreateImageSource(out ImageSource? imageSource))
+                {
+                    return;
+                }
+
                 page.RenderedImage = imageSource;
                 page.RenderedScale = targetScale;
                 page.RenderedTheme = activeTheme;
@@ -326,17 +326,25 @@ public sealed class ViewportRenderCoordinator : IDisposable
         }
         finally
         {
-            _dispatcherQueue.TryEnqueue(() =>
+            if (!_dispatcherQueue.TryEnqueue(() =>
             {
-                page.IsRendering = false;
-                if (_activeRenders.TryGetValue(page.PageIndex, out CancellationTokenSource? existing) &&
-                    ReferenceEquals(existing, cts))
+                try
                 {
-                    _activeRenders.Remove(page.PageIndex);
+                    if (!_activeRenders.TryGetValue(page.PageIndex, out CancellationTokenSource? existing) ||
+                        ReferenceEquals(existing, cts))
+                    {
+                        _activeRenders.Remove(page.PageIndex);
+                        page.IsRendering = false;
+                    }
                 }
-            });
-
-            cts.Dispose();
+                finally
+                {
+                    cts.Dispose();
+                }
+            }))
+            {
+                cts.Dispose();
+            }
         }
     }
 }

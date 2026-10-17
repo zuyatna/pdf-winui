@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Xaml.Media;
@@ -9,7 +10,10 @@ namespace PdfReader.App.Rendering;
 
 public sealed class PageFrame : IDisposable
 {
+    private readonly object _gate = new();
     private byte[]? _bgraPixels;
+    private ImageSource? _imageSource;
+    private bool _disposed;
 
     public PageFrame(int pageIndex, PixelSize size, int stride, byte[] bgraPixels)
     {
@@ -40,21 +44,51 @@ public sealed class PageFrame : IDisposable
 
     public long ByteSize { get; }
 
-    public bool IsDisposed => _bgraPixels is null;
-
-    public ImageSource CreateImageSource()
+    public bool IsDisposed
     {
-        byte[] pixels = _bgraPixels ?? throw new ObjectDisposedException(nameof(PageFrame));
+        get
+        {
+            lock (_gate)
+            {
+                return _disposed;
+            }
+        }
+    }
 
-        var bitmap = new WriteableBitmap(Size.Width, Size.Height);
-        using Stream pixelStream = bitmap.PixelBuffer.AsStream();
-        pixelStream.Write(pixels, 0, pixels.Length);
-        bitmap.Invalidate();
-        return bitmap;
+    // Called on the UI thread; eviction can dispose the frame from a render thread.
+    public bool TryCreateImageSource([NotNullWhen(true)] out ImageSource? imageSource)
+    {
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                imageSource = null;
+                return false;
+            }
+
+            if (_imageSource is null)
+            {
+                byte[] pixels = _bgraPixels ?? throw new InvalidOperationException("Frame pixels are unavailable.");
+                var bitmap = new WriteableBitmap(Size.Width, Size.Height);
+                using Stream pixelStream = bitmap.PixelBuffer.AsStream();
+                pixelStream.Write(pixels, 0, pixels.Length);
+                bitmap.Invalidate();
+                _imageSource = bitmap;
+                _bgraPixels = null;
+            }
+
+            imageSource = _imageSource;
+            return true;
+        }
     }
 
     public void Dispose()
     {
-        _bgraPixels = null;
+        lock (_gate)
+        {
+            _disposed = true;
+            _bgraPixels = null;
+            _imageSource = null;
+        }
     }
 }

@@ -16,7 +16,7 @@ Its defining feature is a **comfortable Dark Reading Mode**: instead of harshly 
 - **High-Performance Virtualized Rendering**
   - Continuous vertical scrolling with viewport virtualization (only visible pages plus a buffer are rendered; off-screen render requests are automatically cancelled).
   - Dedicated single-threaded `PdfiumWorker` with a bounded work queue for thread-safe native PDFium execution and deterministic `SafeHandle`/`IDisposable` cleanup.
-  - Display-DPI aware rendering (`XamlRoot.RasterizationScale * ZoomFactor`) backed by a byte-budgeted LRU bitmap cache (`256 MB` cap).
+  - Display-DPI aware rendering (`XamlRoot.RasterizationScale * ZoomFactor`) backed by a byte-budgeted LRU bitmap cache (`128 MiB` pixel budget; UI/runtime/GPU overhead is additional). Cached frames reuse their display bitmap and release the original managed pixel buffer after upload. Page items retain images only within the viewport and its two-page buffer on each side.
 - **Reading & Navigation**
   - **Table of Contents**: Open the hamburger button to show the PDF's embedded outline or personal bookmarks. Clicking a heading follows its position within the page, including rotated/cropped pages. Destinations without a position fall back to the page top. PDFs without an outline show an empty state.
   - **Personal Bookmarks**: Press `Ctrl + D` to toggle a bookmark for the current page. In the **Bookmarks** tab, enter a title and use **Save / update bookmark** to add or rename it; click a bookmark to navigate or use its delete button to remove it. Bookmarks are saved locally per file, survive clearing recent files, and do not modify the PDF.
@@ -25,10 +25,10 @@ Its defining feature is a **comfortable Dark Reading Mode**: instead of harshly 
   - **Go to Page** using the toolbar page box and live page indicator.
   - Per-file view state persistence (automatically restores last visited page and zoom mode/level) and a **Recent Files** list on the home screen.
 - **Interaction Modes & Text Tools**
-  - **Minimal Toolbar**: Hamburger navigation, Open PDF, page controls, zoom controls and an **Advanced** ellipsis menu. Click the zoom percentage for Fit width, Fit page or Actual size.
+  - **Minimal Toolbar**: Hamburger navigation, Open PDF, a **Reading / Select Text** mode toggle, page controls, zoom controls and an **Advanced** ellipsis menu. Click the zoom percentage for Fit width, Fit page or Actual size.
   - **Reading Mode**: Pan and scroll pages naturally by clicking and dragging (or double-tap dragging on a trackpad).
-  - **Text Selection Mode**: Enable **Advanced > Text selection**, then drag across text and copy it using **Advanced > Copy selected text** or `Ctrl + C`.
-  - **Advanced Menu**: Find, Dark reading and Appearance are grouped with the text tools; the keyboard shortcuts remain available while the menu is closed.
+  - **Text Selection Mode**: Click **Reading** in the toolbar to switch to **Select Text**, then drag across text and copy it using **Advanced > Copy selected text** or `Ctrl + C`. Click **Select Text** to return to **Reading**.
+  - **Advanced Menu**: Copy selected text, Find, Dark reading and Appearance; the keyboard shortcuts remain available while the menu is closed.
   - **Full-Document Search**: Find bar (`Ctrl + F`) with highlighted page matches and next/previous navigation (`Enter` / `F3` / `Shift + F3`).
 - **Windows 11 Shell Integration**
   - `.pdf` file type association, command-line file opening (`PdfReader.App.exe "path\to\document.pdf"`), and drag-and-drop onto the app window.
@@ -123,6 +123,8 @@ dotnet publish .\PdfReader.App\PdfReader.App.csproj `
   -p:WindowsAppSDKSelfContained=true `
   -p:PublishSingleFile=true `
   -p:IncludeAllContentForSelfExtract=true `
+  -p:PublishReadyToRun=false `
+  -p:EnableCompressionInSingleFile=false `
   -p:DebugType=None `
   -p:DebugSymbols=false `
   -o .\artifacts\single-file\win-x64
@@ -138,11 +140,15 @@ The distributable file is `artifacts\single-file\win-x64\PdfReader.App.exe`. Lau
 - `--self-contained true` and `WindowsAppSDKSelfContained=true` bundle both .NET and the Windows App SDK runtime.
 - `IncludeAllContentForSelfExtract=true` bundles native libraries and content, including PDFium and app resources. At launch, these dependencies are automatically extracted to a temporary directory; you only distribute the EXE.
 - `DebugType=None` and `DebugSymbols=false` omit separate debug-symbol files.
+- Single-file publishing disables ReadyToRun to reduce executable size and disables bundle compression. Dependencies are still extracted at launch, without decompression. Other Release deployment modes retain ReadyToRun. Startup can be slower because more code is JIT-compiled.
+- Trimming remains disabled: the current Windows SDK interop dependencies produce `IL2081` diagnostics during trimmed publishing. Native Windows App SDK components are retained rather than removing runtime files manually.
 - For ARM64, replace `-r win-x64` with `-r win-arm64`, `Platform=x64` with `Platform=ARM64`, and the output folder with `artifacts\single-file\win-arm64`.
 
 This publish mode is unpackaged. PDF file associations declared in `Package.appxmanifest` are applied through MSIX deployment; the standalone EXE can open PDFs through its picker, drag-and-drop, or command-line arguments.
 
 See Microsoft's [single-file WinUI deployment documentation](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/unpackage-winui-app#single-file-exe) for the required settings and extraction behavior.
+
+For measured size and memory results, trade-offs and reproduction steps, see [Size and memory optimization verification](docs/verification/size-memory-optimization.md).
 
 ### 3. Run and Debug in Visual Studio 2026
 
