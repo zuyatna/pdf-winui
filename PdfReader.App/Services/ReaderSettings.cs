@@ -1,36 +1,45 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.Json.Serialization;
 using PdfReader.Core;
 
 namespace PdfReader.App.Services;
 
 public sealed record ReaderSettings
 {
-    public const string DefaultDarkPageBackgroundHex = "#262624";
-    public const string DefaultDarkTextHex = "#FAF9F5";
-    public const string DefaultDarkCanvasHex = "#1F1E1D";
-    public const string DefaultOledPageBackgroundHex = "#000000";
-    public const string DefaultOledTextHex = "#FAF9F5";
-    public const string DefaultOledCanvasHex = "#000000";
     public const double DefaultImageDimPercentage = 10.0;
     public const int MaxRecentDocuments = 10;
+
+    public static IReadOnlyDictionary<ReadingThemeMode, ReadingPaletteHex> EmptyPalettes { get; } =
+        new Dictionary<ReadingThemeMode, ReadingPaletteHex>();
 
     public AppUiTheme UiTheme { get; init; } = AppUiTheme.System;
 
     public ReadingThemeMode ReadingTheme { get; init; } = ReadingThemeMode.Dark;
 
-    public string DarkPageBackgroundHex { get; init; } = DefaultDarkPageBackgroundHex;
+    // User-edited colors per reading theme. Themes without an entry use their preset defaults.
+    public IReadOnlyDictionary<ReadingThemeMode, ReadingPaletteHex> CustomPalettes { get; init; } = EmptyPalettes;
 
-    public string DarkTextHex { get; init; } = DefaultDarkTextHex;
+    // Legacy flat palette fields written by earlier versions. Read once, migrated into CustomPalettes
+    // by WithLegacyPalettesMigrated, and no longer written.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DarkPageBackgroundHex { get; init; }
 
-    public string DarkCanvasHex { get; init; } = DefaultDarkCanvasHex;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DarkTextHex { get; init; }
 
-    public string OledPageBackgroundHex { get; init; } = DefaultOledPageBackgroundHex;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DarkCanvasHex { get; init; }
 
-    public string OledTextHex { get; init; } = DefaultOledTextHex;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? OledPageBackgroundHex { get; init; }
 
-    public string OledCanvasHex { get; init; } = DefaultOledCanvasHex;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? OledTextHex { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? OledCanvasHex { get; init; }
 
     public double ImageDimPercentage { get; init; } = DefaultImageDimPercentage;
 
@@ -46,20 +55,76 @@ public sealed record ReaderSettings
             return ReadingThemePalette.Original;
         }
 
-        bool isOled = ReadingTheme == ReadingThemeMode.Oled;
-        ReadingThemePalette defaults = isOled ? ReadingThemePalette.DefaultOled : ReadingThemePalette.DefaultDark;
-        RgbColor pageBg = RgbColor.TryParseHex(isOled ? OledPageBackgroundHex : DarkPageBackgroundHex, out RgbColor parsedBg)
+        ReadingThemePalette defaults = ReadingThemePalette.GetDefault(ReadingTheme);
+        ReadingPaletteHex hex = GetPaletteHex(defaults.Mode);
+        RgbColor pageBg = RgbColor.TryParseHex(hex.PageBackgroundHex, out RgbColor parsedBg)
             ? parsedBg
             : defaults.PageBackground;
-        RgbColor text = RgbColor.TryParseHex(isOled ? OledTextHex : DarkTextHex, out RgbColor parsedText)
+        RgbColor text = RgbColor.TryParseHex(hex.TextHex, out RgbColor parsedText)
             ? parsedText
             : defaults.Text;
-        RgbColor canvas = RgbColor.TryParseHex(isOled ? OledCanvasHex : DarkCanvasHex, out RgbColor parsedCanvas)
+        RgbColor canvas = RgbColor.TryParseHex(hex.CanvasHex, out RgbColor parsedCanvas)
             ? parsedCanvas
             : defaults.Canvas;
 
         double dimAmount = Math.Clamp(ImageDimPercentage, 0.0, 50.0) / 100.0;
         return new ReadingThemePalette(defaults.Mode, pageBg, text, canvas, dimAmount);
+    }
+
+    public ReadingPaletteHex GetPaletteHex(ReadingThemeMode mode) => ResolvePaletteHex(CustomPalettes, mode);
+
+    // Returns the stored colors for a theme, filling missing entries or fields from the preset.
+    public static ReadingPaletteHex ResolvePaletteHex(
+        IReadOnlyDictionary<ReadingThemeMode, ReadingPaletteHex>? palettes,
+        ReadingThemeMode mode)
+    {
+        ReadingPaletteHex defaults = ReadingPaletteHex.From(ReadingThemePalette.GetDefault(mode));
+        if (palettes is null || !palettes.TryGetValue(mode, out ReadingPaletteHex? custom) || custom is null)
+        {
+            return defaults;
+        }
+
+        return new ReadingPaletteHex(
+            custom.PageBackgroundHex ?? defaults.PageBackgroundHex,
+            custom.TextHex ?? defaults.TextHex,
+            custom.CanvasHex ?? defaults.CanvasHex);
+    }
+
+    public ReaderSettings WithLegacyPalettesMigrated()
+    {
+        var palettes = new Dictionary<ReadingThemeMode, ReadingPaletteHex>(CustomPalettes ?? EmptyPalettes);
+        AddLegacyPalette(palettes, ReadingThemeMode.Dark, DarkPageBackgroundHex, DarkTextHex, DarkCanvasHex);
+        AddLegacyPalette(palettes, ReadingThemeMode.Oled, OledPageBackgroundHex, OledTextHex, OledCanvasHex);
+
+        return this with
+        {
+            CustomPalettes = palettes.AsReadOnly(),
+            DarkPageBackgroundHex = null,
+            DarkTextHex = null,
+            DarkCanvasHex = null,
+            OledPageBackgroundHex = null,
+            OledTextHex = null,
+            OledCanvasHex = null,
+        };
+    }
+
+    private static void AddLegacyPalette(
+        Dictionary<ReadingThemeMode, ReadingPaletteHex> palettes,
+        ReadingThemeMode mode,
+        string? pageBackgroundHex,
+        string? textHex,
+        string? canvasHex)
+    {
+        if (palettes.ContainsKey(mode) || (pageBackgroundHex is null && textHex is null && canvasHex is null))
+        {
+            return;
+        }
+
+        ReadingPaletteHex defaults = ReadingPaletteHex.From(ReadingThemePalette.GetDefault(mode));
+        palettes[mode] = new ReadingPaletteHex(
+            pageBackgroundHex ?? defaults.PageBackgroundHex,
+            textHex ?? defaults.TextHex,
+            canvasHex ?? defaults.CanvasHex);
     }
 
     public DocumentViewState? FindDocumentState(string filePath)

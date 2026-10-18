@@ -39,11 +39,11 @@ public sealed class ReaderSettingsService
             ReaderSettings settings = JsonSerializer.Deserialize(json, ReaderSettingsJsonContext.Default.ReaderSettings)
                 ?? new ReaderSettings();
             // Source-generated init-only setters can receive null for fields absent in older JSON.
-            return settings with
+            return (settings with
             {
                 RecentDocuments = settings.RecentDocuments ?? [],
                 BookmarkedDocuments = settings.BookmarkedDocuments ?? [],
-            };
+            }).WithLegacyPalettesMigrated();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {

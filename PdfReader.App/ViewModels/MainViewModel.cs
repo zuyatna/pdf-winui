@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -36,6 +37,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private double _viewportHeightDip = 700.0;
     private bool _suppressThemeSync;
     private ReadingThemeMode _lastDarkReadingTheme = ReadingThemeMode.Dark;
+    private IReadOnlyDictionary<ReadingThemeMode, ReadingPaletteHex> _customPalettes = ReaderSettings.EmptyPalettes;
     private bool _isUpdatingPageFromScroll;
     private bool _disposed;
 
@@ -150,58 +152,42 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty]
     public partial bool IsDarkReadingMode { get; set; }
 
-    [ObservableProperty]
-    public partial string DarkPageBackgroundHex { get; set; } = ReaderSettings.DefaultDarkPageBackgroundHex;
+    // The palette editor targets the selected dark theme; with Original selected it edits Dark.
+    private ReadingThemeMode EditorPaletteMode => IsDarkReadingTheme(SelectedReadingThemeIndex)
+        ? (ReadingThemeMode)SelectedReadingThemeIndex
+        : ReadingThemeMode.Dark;
 
-    [ObservableProperty]
-    public partial string DarkTextHex { get; set; } = ReaderSettings.DefaultDarkTextHex;
-
-    [ObservableProperty]
-    public partial string DarkCanvasHex { get; set; } = ReaderSettings.DefaultDarkCanvasHex;
-
-    [ObservableProperty]
-    public partial string OledPageBackgroundHex { get; set; } = ReaderSettings.DefaultOledPageBackgroundHex;
-
-    [ObservableProperty]
-    public partial string OledTextHex { get; set; } = ReaderSettings.DefaultOledTextHex;
-
-    [ObservableProperty]
-    public partial string OledCanvasHex { get; set; } = ReaderSettings.DefaultOledCanvasHex;
-
-    private bool IsOledPalette => SelectedReadingThemeIndex == (int)ReadingThemeMode.Oled;
+    private ReadingPaletteHex EditorPalette => ReaderSettings.ResolvePaletteHex(_customPalettes, EditorPaletteMode);
 
     public string PageBackgroundHex
     {
-        get => IsOledPalette ? OledPageBackgroundHex : DarkPageBackgroundHex;
-        set
-        {
-            if (IsOledPalette) { OledPageBackgroundHex = value; }
-            else { DarkPageBackgroundHex = value; }
-            OnPropertyChanged();
-        }
+        get => EditorPalette.PageBackgroundHex;
+        set => SetEditorPalette(EditorPalette with { PageBackgroundHex = value });
     }
 
     public string TextHex
     {
-        get => IsOledPalette ? OledTextHex : DarkTextHex;
-        set
-        {
-            if (IsOledPalette) { OledTextHex = value; }
-            else { DarkTextHex = value; }
-            OnPropertyChanged();
-        }
+        get => EditorPalette.TextHex;
+        set => SetEditorPalette(EditorPalette with { TextHex = value });
     }
 
     public string CanvasHex
     {
-        get => IsOledPalette ? OledCanvasHex : DarkCanvasHex;
-        set
-        {
-            if (IsOledPalette) { OledCanvasHex = value; }
-            else { DarkCanvasHex = value; }
-            OnPropertyChanged();
-        }
+        get => EditorPalette.CanvasHex;
+        set => SetEditorPalette(EditorPalette with { CanvasHex = value });
     }
+
+    private void SetEditorPalette(ReadingPaletteHex palette, [CallerMemberName] string? propertyName = null)
+    {
+        _customPalettes = new Dictionary<ReadingThemeMode, ReadingPaletteHex>(_customPalettes)
+        {
+            [EditorPaletteMode] = palette,
+        };
+        OnPropertyChanged(propertyName);
+    }
+
+    private static bool IsDarkReadingTheme(int themeIndex) =>
+        themeIndex != (int)ReadingThemeMode.Original && Enum.IsDefined(typeof(ReadingThemeMode), themeIndex);
 
     [ObservableProperty]
     public partial double ImageDimPercentage { get; set; } = ReaderSettings.DefaultImageDimPercentage;
@@ -615,9 +601,10 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         _suppressThemeSync = true;
         try
         {
-            PageBackgroundHex = IsOledPalette ? ReaderSettings.DefaultOledPageBackgroundHex : ReaderSettings.DefaultDarkPageBackgroundHex;
-            TextHex = IsOledPalette ? ReaderSettings.DefaultOledTextHex : ReaderSettings.DefaultDarkTextHex;
-            CanvasHex = IsOledPalette ? ReaderSettings.DefaultOledCanvasHex : ReaderSettings.DefaultDarkCanvasHex;
+            ReadingPaletteHex defaults = ReadingPaletteHex.From(ReadingThemePalette.GetDefault(EditorPaletteMode));
+            PageBackgroundHex = defaults.PageBackgroundHex;
+            TextHex = defaults.TextHex;
+            CanvasHex = defaults.CanvasHex;
             ImageDimPercentage = ReaderSettings.DefaultImageDimPercentage;
         }
         finally
@@ -907,7 +894,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         _suppressThemeSync = true;
         try
         {
-            IsDarkReadingMode = value is (int)ReadingThemeMode.Dark or (int)ReadingThemeMode.Oled;
+            IsDarkReadingMode = IsDarkReadingTheme(value);
             if (IsDarkReadingMode)
             {
                 _lastDarkReadingTheme = (ReadingThemeMode)value;
@@ -1093,17 +1080,15 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             SelectedUiThemeIndex = (int)settings.UiTheme;
             SelectedReadingThemeIndex = (int)settings.ReadingTheme;
-            IsDarkReadingMode = settings.ReadingTheme is ReadingThemeMode.Dark or ReadingThemeMode.Oled;
+            IsDarkReadingMode = IsDarkReadingTheme((int)settings.ReadingTheme);
             if (IsDarkReadingMode)
             {
                 _lastDarkReadingTheme = settings.ReadingTheme;
             }
-            DarkPageBackgroundHex = settings.DarkPageBackgroundHex;
-            DarkTextHex = settings.DarkTextHex;
-            DarkCanvasHex = settings.DarkCanvasHex;
-            OledPageBackgroundHex = settings.OledPageBackgroundHex ?? ReaderSettings.DefaultOledPageBackgroundHex;
-            OledTextHex = settings.OledTextHex ?? ReaderSettings.DefaultOledTextHex;
-            OledCanvasHex = settings.OledCanvasHex ?? ReaderSettings.DefaultOledCanvasHex;
+            _customPalettes = settings.CustomPalettes ?? ReaderSettings.EmptyPalettes;
+            OnPropertyChanged(nameof(PageBackgroundHex));
+            OnPropertyChanged(nameof(TextHex));
+            OnPropertyChanged(nameof(CanvasHex));
             ImageDimPercentage = Math.Clamp(settings.ImageDimPercentage, 0.0, 50.0);
             _recentDocumentStates = settings.RecentDocuments ?? [];
             _bookmarkedDocumentStates = settings.BookmarkedDocuments ?? [];
@@ -1183,12 +1168,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             ReadingTheme = Enum.IsDefined(typeof(ReadingThemeMode), SelectedReadingThemeIndex)
                 ? (ReadingThemeMode)SelectedReadingThemeIndex
                 : ReadingThemeMode.Dark,
-            DarkPageBackgroundHex = DarkPageBackgroundHex,
-            DarkTextHex = DarkTextHex,
-            DarkCanvasHex = DarkCanvasHex,
-            OledPageBackgroundHex = OledPageBackgroundHex,
-            OledTextHex = OledTextHex,
-            OledCanvasHex = OledCanvasHex,
+            CustomPalettes = _customPalettes,
             ImageDimPercentage = Math.Clamp(ImageDimPercentage, 0.0, 50.0),
             RecentDocuments = _recentDocumentStates,
             BookmarkedDocuments = _bookmarkedDocumentStates,

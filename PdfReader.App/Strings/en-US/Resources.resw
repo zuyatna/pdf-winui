@@ -133,6 +133,15 @@
   <data name="ReadingThemeOledItem.Content" xml:space="preserve">
     <value>OLED (Pure Black)</value>
   </data>
+  <data name="ReadingThemeObsidianItem.Content" xml:space="preserve">
+    <value>Obsidian Dark</value>
+  </data>
+  <data name="ReadingThemeGitHubItem.Content" xml:space="preserve">
+    <value>GitHub Dark</value>
+  </data>
+  <data name="ReadingThemeJetBrainsItem.Content" xml:space="preserve">
+    <value>JetBrains Dark</value>
+  </data>
   <data name="ReadingThemeDarkItem.Content" xml:space="preserve">
     <value>Dark (Warm Palette)</value>
   </data>

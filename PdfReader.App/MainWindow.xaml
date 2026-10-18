@@ -256,6 +256,9 @@
                                 <ComboBoxItem x:Uid="ReadingThemeOriginalItem" Content="Original (Unchanged)" />
                                 <ComboBoxItem x:Uid="ReadingThemeDarkItem" Content="Dark (Warm Palette)" />
                                 <ComboBoxItem x:Uid="ReadingThemeOledItem" Content="OLED (Pure Black)" />
+                                <ComboBoxItem x:Uid="ReadingThemeObsidianItem" Content="Obsidian Dark" />
+                                <ComboBoxItem x:Uid="ReadingThemeGitHubItem" Content="GitHub Dark" />
+                                <ComboBoxItem x:Uid="ReadingThemeJetBrainsItem" Content="JetBrains Dark" />
                             </ComboBox>
 
                             <Border

@@ -8,18 +8,18 @@ namespace PdfReader.Settings.Tests;
 public sealed class ReadingThemeSettingsTests
 {
     [TestMethod]
-    public void OledDefaultsUseBlackPaperAndCanvasWithWarmText()
+    [DataRow(ReadingThemeMode.Dark)]
+    [DataRow(ReadingThemeMode.Oled)]
+    [DataRow(ReadingThemeMode.Obsidian)]
+    [DataRow(ReadingThemeMode.GitHub)]
+    [DataRow(ReadingThemeMode.JetBrains)]
+    public void UncustomizedThemeUsesPresetDefaults(ReadingThemeMode mode)
     {
-        var settings = new ReaderSettings { ReadingTheme = ReadingThemeMode.Oled };
+        var settings = new ReaderSettings { ReadingTheme = mode };
 
         ReadingThemePalette palette = settings.ToReadingThemePalette();
 
-        Assert.AreEqual(ReadingThemeMode.Oled, palette.Mode);
-        Assert.IsTrue(palette.IsRemapEnabled);
-        Assert.AreEqual(RgbColor.Black, palette.PageBackground);
-        Assert.AreEqual(RgbColor.Black, palette.Canvas);
-        Assert.AreEqual(RgbColor.FromHex("#FAF9F5"), palette.Text);
-        Assert.AreEqual(0.10, palette.ImageDimAmount, 0.0001);
+        Assert.AreEqual(ReadingThemePalette.GetDefault(mode), palette);
     }
 
     [TestMethod]
@@ -28,52 +28,64 @@ public sealed class ReadingThemeSettingsTests
         var settings = new ReaderSettings
         {
             ReadingTheme = ReadingThemeMode.Oled,
-            DarkPageBackgroundHex = "#121314",
-            DarkTextHex = "#ECEDEE",
-            DarkCanvasHex = "#151617",
-            OledPageBackgroundHex = "#010203",
-            OledTextHex = "#DADBDC",
-            OledCanvasHex = "#040506",
+            CustomPalettes = new Dictionary<ReadingThemeMode, ReadingPaletteHex>
+            {
+                [ReadingThemeMode.Dark] = new("#121314", "#ECEDEE", "#151617"),
+                [ReadingThemeMode.Oled] = new("#010203", "#DADBDC", "#040506"),
+                [ReadingThemeMode.GitHub] = new("#0A0B0C", "#E1E2E3", "#020304"),
+            },
             ImageDimPercentage = 25,
         };
 
         ReadingThemePalette oled = settings.ToReadingThemePalette();
         ReadingThemePalette dark = (settings with { ReadingTheme = ReadingThemeMode.Dark }).ToReadingThemePalette();
+        ReadingThemePalette gitHub = (settings with { ReadingTheme = ReadingThemeMode.GitHub }).ToReadingThemePalette();
+        ReadingThemePalette jetBrains = (settings with { ReadingTheme = ReadingThemeMode.JetBrains }).ToReadingThemePalette();
         ReadingThemePalette original = (settings with { ReadingTheme = ReadingThemeMode.Original }).ToReadingThemePalette();
 
-        Assert.AreEqual(RgbColor.FromHex("#010203"), oled.PageBackground);
-        Assert.AreEqual(RgbColor.FromHex("#DADBDC"), oled.Text);
-        Assert.AreEqual(RgbColor.FromHex("#040506"), oled.Canvas);
-        Assert.AreEqual(0.25, oled.ImageDimAmount, 0.0001);
+        Assert.AreEqual(new ReadingThemePalette(ReadingThemeMode.Oled,
+            RgbColor.FromHex("#010203"), RgbColor.FromHex("#DADBDC"), RgbColor.FromHex("#040506"), 0.25), oled);
         Assert.AreEqual(RgbColor.FromHex("#121314"), dark.PageBackground);
         Assert.AreEqual(RgbColor.FromHex("#ECEDEE"), dark.Text);
         Assert.AreEqual(RgbColor.FromHex("#151617"), dark.Canvas);
+        Assert.AreEqual(ReadingThemeMode.GitHub, gitHub.Mode);
+        Assert.AreEqual(RgbColor.FromHex("#0A0B0C"), gitHub.PageBackground);
+        Assert.AreEqual(ReadingThemePalette.DefaultJetBrains with { ImageDimAmount = 0.25 }, jetBrains);
         Assert.AreEqual(ReadingThemePalette.Original, original);
     }
 
     [TestMethod]
-    public void InvalidOledColorsFallBackToOledDefaults()
+    public void InvalidOrMissingColorsFallBackToSelectedThemeDefaults()
     {
         var settings = new ReaderSettings
         {
-            ReadingTheme = ReadingThemeMode.Oled,
-            OledPageBackgroundHex = "invalid",
-            OledTextHex = "#12345",
-            OledCanvasHex = "",
+            ReadingTheme = ReadingThemeMode.Obsidian,
+            CustomPalettes = new Dictionary<ReadingThemeMode, ReadingPaletteHex>
+            {
+                [ReadingThemeMode.Obsidian] = new("invalid", "#12345", null!),
+            },
         };
 
         ReadingThemePalette palette = settings.ToReadingThemePalette();
 
-        Assert.AreEqual(RgbColor.Black, palette.PageBackground);
-        Assert.AreEqual(RgbColor.DefaultDarkText, palette.Text);
-        Assert.AreEqual(RgbColor.Black, palette.Canvas);
+        Assert.AreEqual(ReadingThemePalette.DefaultObsidian, palette);
+        Assert.AreEqual("#282828", settings.GetPaletteHex(ReadingThemeMode.Obsidian).CanvasHex);
     }
 
     [TestMethod]
-    public async Task SavedOledThemeReloadsAndLegacySettingsRetainWarmPalette()
+    public void GetPaletteHexReturnsPresetHexForUncustomizedTheme()
     {
-        string directory = Path.Combine(Path.GetTempPath(), $"pdf-reader-oled-tests-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(directory);
+        var settings = new ReaderSettings();
+
+        ReadingPaletteHex jetBrains = settings.GetPaletteHex(ReadingThemeMode.JetBrains);
+
+        Assert.AreEqual(new ReadingPaletteHex("#1E1F22", "#BCBEC4", "#2B2D30"), jetBrains);
+    }
+
+    [TestMethod]
+    public async Task SavedPresetThemeReloadsWithCustomPalettes()
+    {
+        string directory = CreateTempDirectory();
         try
         {
             string path = Path.Combine(directory, "settings.json");
@@ -81,32 +93,83 @@ public sealed class ReadingThemeSettingsTests
             var settings = new ReaderSettings
             {
                 UiTheme = AppUiTheme.Light,
-                ReadingTheme = ReadingThemeMode.Oled,
-                OledTextHex = "#E0D0C0",
-                DarkPageBackgroundHex = "#212223",
+                ReadingTheme = ReadingThemeMode.JetBrains,
+                CustomPalettes = new Dictionary<ReadingThemeMode, ReadingPaletteHex>
+                {
+                    [ReadingThemeMode.JetBrains] = new("#1E1F22", "#E0D0C0", "#2B2D30"),
+                    [ReadingThemeMode.Dark] = new("#212223", "#FAF9F5", "#1F1E1D"),
+                },
             };
 
             service.Save(settings);
             await service.FlushAsync();
             ReaderSettings reloaded = service.Load();
 
-            Assert.AreEqual(ReadingThemeMode.Oled, reloaded.ReadingTheme);
+            Assert.AreEqual(ReadingThemeMode.JetBrains, reloaded.ReadingTheme);
             Assert.AreEqual(settings.ToReadingThemePalette(), reloaded.ToReadingThemePalette());
-            Assert.AreEqual(settings.DarkPageBackgroundHex, reloaded.DarkPageBackgroundHex);
             Assert.AreEqual(RgbColor.FromHex("#E0D0C0"), reloaded.ToReadingThemePalette().Text);
+            Assert.AreEqual("#212223", reloaded.GetPaletteHex(ReadingThemeMode.Dark).PageBackgroundHex);
             Assert.AreEqual(AppUiTheme.Light, reloaded.UiTheme);
-
-            await File.WriteAllTextAsync(path, """{"ReadingTheme":1,"DarkPageBackgroundHex":"#303132"}""");
-            ReaderSettings legacy = service.Load();
-
-            Assert.AreEqual(ReadingThemeMode.Dark, legacy.ReadingTheme);
-            Assert.AreEqual(RgbColor.FromHex("#303132"), legacy.ToReadingThemePalette().PageBackground);
-            Assert.AreEqual(RgbColor.Black,
-                (legacy with { ReadingTheme = ReadingThemeMode.Oled }).ToReadingThemePalette().PageBackground);
+            Assert.DoesNotContain("DarkPageBackgroundHex", await File.ReadAllTextAsync(path));
         }
         finally
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [TestMethod]
+    public async Task LegacyFlatPaletteFieldsMigrateIntoCustomPalettes()
+    {
+        string directory = CreateTempDirectory();
+        try
+        {
+            string path = Path.Combine(directory, "settings.json");
+            var service = new ReaderSettingsService(path);
+            await File.WriteAllTextAsync(path,
+                """{"ReadingTheme":2,"DarkPageBackgroundHex":"#303132","OledTextHex":"#E0D0C0"}""");
+
+            ReaderSettings legacy = service.Load();
+
+            Assert.AreEqual(ReadingThemeMode.Oled, legacy.ReadingTheme);
+            Assert.AreEqual(new ReadingPaletteHex("#303132", "#FAF9F5", "#1F1E1D"),
+                legacy.GetPaletteHex(ReadingThemeMode.Dark));
+            Assert.AreEqual(new ReadingPaletteHex("#000000", "#E0D0C0", "#000000"),
+                legacy.GetPaletteHex(ReadingThemeMode.Oled));
+            Assert.AreEqual(ReadingPaletteHex.From(ReadingThemePalette.DefaultGitHub),
+                legacy.GetPaletteHex(ReadingThemeMode.GitHub));
+            Assert.IsNull(legacy.DarkPageBackgroundHex);
+            Assert.IsNull(legacy.OledTextHex);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void LegacyMigrationKeepsExistingCustomPaletteEntries()
+    {
+        var settings = new ReaderSettings
+        {
+            DarkPageBackgroundHex = "#303132",
+            CustomPalettes = new Dictionary<ReadingThemeMode, ReadingPaletteHex>
+            {
+                [ReadingThemeMode.Dark] = new("#404142", "#FAF9F5", "#1F1E1D"),
+            },
+        };
+
+        ReaderSettings migrated = settings.WithLegacyPalettesMigrated();
+
+        Assert.AreEqual("#404142", migrated.GetPaletteHex(ReadingThemeMode.Dark).PageBackgroundHex);
+        Assert.IsFalse(migrated.CustomPalettes.ContainsKey(ReadingThemeMode.Oled));
+        Assert.IsNull(migrated.DarkPageBackgroundHex);
+    }
+
+    private static string CreateTempDirectory()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"pdf-reader-theme-tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        return directory;
     }
 }

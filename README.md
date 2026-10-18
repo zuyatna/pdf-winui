@@ -9,8 +9,9 @@ Its defining feature is a **comfortable Dark Reading Mode**: instead of harshly 
 ## Key Features
 
 - **Comfortable Dark Reading Mode**
-  - **Two Independent Theme Layers**: Switch the App UI Theme (`System`, `Light`, `Dark`) independently from the Page Reading Theme (`Original`, `Dark`, `OLED`).
-  - **OLED Reading Theme**: Choose **Advanced > Appearance > Page reading theme (Layer 2) > OLED (Pure Black)** for `#000000` page and canvas backgrounds with warm `#FAF9F5` text. Dark and OLED keep separate customizable palettes; **Reset Defaults** resets the selected palette. The **Dark reading** toggle switches the current dark theme off and restores it when switched on again during the same session.
+  - **Two Independent Theme Layers**: Switch the App UI Theme (`System`, `Light`, `Dark`) independently from the Page Reading Theme (`Original`, `Dark`, `OLED`, `Obsidian Dark`, `GitHub Dark`, `JetBrains Dark`).
+  - **OLED Reading Theme**: Choose **Advanced > Appearance > Page reading theme (Layer 2) > OLED (Pure Black)** for `#000000` page and canvas backgrounds with warm `#FAF9F5` text. Every dark reading theme keeps its own customizable palette; **Reset Defaults** resets the selected palette. The **Dark reading** toggle switches the current dark theme off and restores it when switched on again during the same session.
+  - **Editor-inspired Presets**: **Obsidian Dark** (page `#1C1C1C`, text `#DADADA`, canvas `#282828`), **GitHub Dark** (page `#0D1117`, text `#F0F6FC`, canvas `#010409`) and **JetBrains Dark** (page `#1E1F22`, text `#BCBEC4`, canvas `#2B2D30`) use the same luminance remap, image preservation and scanned-page handling as Dark.
   - **GPU Luminance Remap**: Maps page luminance smoothly between customizable **Page Background** (`#262624`), **Text** (`#FAF9F5`), and **Canvas** (`#1F1E1D`) colors via a Win2D `ColorMatrixEffect`.
   - **Image Preservation & Dimming**: Embedded images retain their original colors with an adjustable dimming slider (`0%`–`50%`) to prevent glare against dark pages.
   - **Scanned Document Detection**: Pages where images cover `>= 85%` of the page area are automatically detected as scanned pages and receive the full-page luminance remap.

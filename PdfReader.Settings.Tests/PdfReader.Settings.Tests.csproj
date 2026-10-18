@@ -11,6 +11,7 @@
     <!-- Compile the portable settings sources without loading the WinUI application. -->
     <Compile Include="..\PdfReader.App\Services\AppUiTheme.cs" Link="Services\AppUiTheme.cs" />
     <Compile Include="..\PdfReader.App\Services\ReaderSettings.cs" Link="Services\ReaderSettings.cs" />
+    <Compile Include="..\PdfReader.App\Services\ReadingPaletteHex.cs" Link="Services\ReadingPaletteHex.cs" />
     <Compile Include="..\PdfReader.App\Services\ReaderSettingsService.cs" Link="Services\ReaderSettingsService.cs" />
     <Compile Include="..\PdfReader.App\Services\ReaderSettingsJsonContext.cs" Link="Services\ReaderSettingsJsonContext.cs" />
   </ItemGroup>
