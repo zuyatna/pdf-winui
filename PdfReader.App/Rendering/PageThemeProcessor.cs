@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Effects;
 using PdfReader.Core;
@@ -12,6 +13,12 @@ namespace PdfReader.App.Rendering;
 public static class PageThemeProcessor
 {
     private static readonly object s_deviceGate = new();
+    private static long s_initialDeviceCacheBytes = -1;
+    private static long s_deviceCacheBytes = -1;
+
+    internal static long InitialDeviceCacheBytes => Interlocked.Read(ref s_initialDeviceCacheBytes);
+
+    internal static long DeviceCacheBytes => Interlocked.Read(ref s_deviceCacheBytes);
 
     public static Matrix5x4 CreateRemap(Color background, Color text)
     {
@@ -65,6 +72,9 @@ public static class PageThemeProcessor
             lock (s_deviceGate)
             {
                 CanvasDevice device = CanvasDevice.GetSharedDevice();
+                long cacheBytes = (long)Math.Min(device.MaximumCacheSize, (ulong)long.MaxValue);
+                Interlocked.CompareExchange(ref s_initialDeviceCacheBytes, cacheBytes, -1);
+                Interlocked.Exchange(ref s_deviceCacheBytes, cacheBytes);
 
                 using var sourceBitmap = CanvasBitmap.CreateFromBytes(
                     device,

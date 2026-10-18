@@ -26,6 +26,7 @@ public sealed partial class MainWindow : Window
     private static readonly TimeSpan s_zoomSettleDelay = TimeSpan.FromMilliseconds(180);
 
     private readonly ViewportRenderCoordinator _viewportCoordinator;
+    private readonly ReadingPerformanceCapture _performanceCapture;
     private readonly DispatcherQueueTimer _zoomDebounceTimer;
     private readonly DispatcherQueueTimer _navigationAlignmentTimer;
     private readonly PointerEventHandler _panPointerPressedHandler;
@@ -69,6 +70,20 @@ public sealed partial class MainWindow : Window
         _panPointerCanceledHandler = new PointerEventHandler(OnPagesListViewPointerCanceled);
 
         InitializeComponent();
+
+        _performanceCapture = new ReadingPerformanceCapture(() =>
+        {
+            int index = PagesListView.ItemsPanelRoot is ItemsStackPanel { FirstVisibleIndex: >= 0 } panel
+                ? FindPrimaryVisiblePage(panel, _scrollViewer?.ViewportHeight ?? PagesListView.ActualHeight)
+                : -1;
+            PdfPageItem? page = index >= 0 && index < ViewModel.Pages.Count ? ViewModel.Pages[index] : null;
+            double scale = _viewportCoordinator.RasterizationScale * ViewModel.Zoom;
+            bool ready = page?.RenderedImage is not null &&
+                Math.Abs(page.RenderedScale - scale) <= 0.001 &&
+                page.RenderedTheme == renderPipeline.ReadingTheme;
+            return (_scrollViewer?.VerticalOffset ?? 0, _scrollViewer?.ExtentHeight ?? 0,
+                _scrollViewer?.ViewportHeight ?? 0, ViewModel.Zoom, index + 1, ready, renderPipeline.CachedBytes);
+        });
 
         PagesListView.AddHandler(UIElement.PointerPressedEvent, _panPointerPressedHandler, handledEventsToo: true);
         PagesListView.AddHandler(UIElement.PointerMovedEvent, _panPointerMovedHandler, handledEventsToo: true);
@@ -600,6 +615,7 @@ public sealed partial class MainWindow : Window
 
     private async void OnWindowClosed(object sender, WindowEventArgs args)
     {
+        ValueTask performanceWrite = _performanceCapture.DisposeAsync();
         _zoomDebounceTimer.Stop();
         _zoomDebounceTimer.Tick -= OnZoomDebounceTimerTick;
 
@@ -628,7 +644,14 @@ public sealed partial class MainWindow : Window
         }
 
         _viewportCoordinator.Dispose();
-        await ViewModel.DisposeAsync();
+        try
+        {
+            await ViewModel.DisposeAsync();
+        }
+        finally
+        {
+            await performanceWrite;
+        }
     }
 
     private static bool IsInsideScrollBar(DependencyObject? element)
