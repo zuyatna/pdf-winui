@@ -218,7 +218,9 @@ public sealed partial class MainWindow : Window
 
     private void OnViewModelZoomChanged(object? sender, EventArgs e)
     {
-        CancelDestinationAlignment();
+        // Fit modes recalculate zoom when the list is first measured. Keep a pending target (such as the
+        // restored last page) and realign it after the relayout instead of dropping it.
+        RestartDestinationAlignment();
         // Keep scaled placeholder bitmaps visible while zoom settles, then re-render at new scale.
         _isZoomSettling = true;
         _viewportCoordinator.CancelAll();
@@ -264,6 +266,19 @@ public sealed partial class MainWindow : Window
         AlignPendingDestination();
     }
 
+    private void RestartDestinationAlignment()
+    {
+        if (_pendingDestination is null)
+        {
+            return;
+        }
+
+        _navigationAlignmentAttempts = 0;
+        _navigationStableFrames = 0;
+        _lastNavigationExtent = -1;
+        _lastNavigationViewport = -1;
+    }
+
     private void CancelDestinationAlignment()
     {
         _navigationAlignmentTimer.Stop();
@@ -273,7 +288,14 @@ public sealed partial class MainWindow : Window
 
     private void AlignPendingDestination()
     {
-        if (_pendingDestination is not PdfPageDestination destination || _scrollViewer is null)
+        if (_pendingDestination is not PdfPageDestination destination)
+        {
+            return;
+        }
+
+        // The list is collapsed until a document loads, so its ScrollViewer may appear only now.
+        EnsureScrollViewerHooked();
+        if (_scrollViewer is null)
         {
             return;
         }
@@ -289,7 +311,10 @@ public sealed partial class MainWindow : Window
             FindDescendant<Views.PdfPageView>(container)?.Content is not Border { Child: FrameworkElement bitmapArea } ||
             bitmapArea.ActualHeight <= 0 || bitmapArea.ActualWidth <= 0)
         {
-            return; // Wait for the virtualized target to be realized and measured.
+            // A request issued while the list was still collapsed is ignored, so repeat it
+            // until the virtualized target is realized and measured.
+            PagesListView.ScrollIntoView(_pendingDestinationPage, ScrollIntoViewAlignment.Leading);
+            return;
         }
 
         Point pageOrigin = bitmapArea.TransformToVisual(_scrollViewer).TransformPoint(new Point(0, 0));
